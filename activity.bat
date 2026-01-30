@@ -1,1 +1,1 @@
-start activity10.py
+start activity.py
