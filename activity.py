@@ -4,7 +4,9 @@ import os
 import sys
 import platform
 import subprocess
-from threading import Thread, Lock
+import tkinter as tk
+from tkinter import messagebox
+from threading import Thread, Lock, Timer
 from pynput import mouse, keyboard
 from pynput.mouse import Controller, Button
 from pynput.keyboard import Controller as KeyboardController, Key
@@ -29,6 +31,8 @@ log_file_path = f"activity_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 current_idle_threshold = None
 last_mouse_log_time = 0
 lunch_sequence_executed = False  # Флаг для отслеживания ввода после обеда
+shutdown_cancelled = False  # Флаг отмены выключения
+user_activity_after_work = False  # Флаг активности пользователя после работы
 
 CONFIG = {}
 SCHEDULE = {}
@@ -271,6 +275,63 @@ def should_simulate_afterhours():
     
     return False
 
+def show_shutdown_warning():
+    """Показывает всплывающее окно с предупреждением о выключении"""
+    global shutdown_cancelled
+    
+    def on_cancel():
+        global shutdown_cancelled
+        shutdown_cancelled = True
+        log("⚠️ Выключение отменено пользователем")
+        root.destroy()
+    
+    def on_timeout():
+        root.destroy()
+    
+    # Создаем окно
+    root = tk.Tk()
+    root.title("⚠️ Предупреждение")
+    root.geometry("400x200")
+    root.resizable(False, False)
+    
+    # Поднимаем окно поверх всех
+    root.attributes('-topmost', True)
+    root.lift()
+    root.focus_force()
+    
+    # Центрируем окно
+    root.update_idletasks()
+    x = (root.winfo_screenwidth() // 2) - (400 // 2)
+    y = (root.winfo_screenheight() // 2) - (200 // 2)
+    root.geometry(f"+{x}+{y}")
+    
+    # Текст предупреждения
+    warning_text = f"⚠️ ВНИМАНИЕ!\n\nРабочий день завершен.\n"
+    
+    if CONFIG.get('shutdown_on_exit', False):
+        warning_text += f"Компьютер будет ВЫКЛЮЧЕН через {CONFIG.get('shutdown_warning_time', 30)} секунд."
+    else:
+        warning_text += f"Компьютер будет ЗАБЛОКИРОВАН через {CONFIG.get('shutdown_warning_time', 30)} секунд."
+    
+    label = tk.Label(root, text=warning_text, font=("Arial", 12), pady=20)
+    label.pack()
+    
+    # Кнопка отмены
+    cancel_btn = tk.Button(root, text="Отменить", command=on_cancel, 
+                          font=("Arial", 12), bg="#ff4444", fg="white",
+                          padx=20, pady=10)
+    cancel_btn.pack(pady=10)
+    
+    # Автоматическое закрытие через заданное время
+    timer = Timer(CONFIG.get('shutdown_warning_time', 30), on_timeout)
+    timer.daemon = True
+    timer.start()
+    
+    # Запускаем окно
+    root.mainloop()
+    
+    return not shutdown_cancelled
+
 # Функция для логирования
 def log(message, level='INFO'):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -291,11 +352,17 @@ def log(message, level='INFO'):
 # === ФУНКЦИИ-СЛУШАТЕЛИ ===
 
 def on_keyboard_event(key):
-    global last_activity_time, is_simulating, current_idle_threshold, absolute_anchor_position, is_performing_action
+    global last_activity_time, is_simulating, current_idle_threshold, absolute_anchor_position, is_performing_action, user_activity_after_work
     
     with global_lock:
         if is_performing_action:
             log(f"Игнорирование симулированного события клавиатуры: {key}", 'DEBUG')
+            return
+
+        # Проверка активности после рабочего дня
+        if CONFIG.get('exit_on_activity_after_work', True) and is_after_work() and not is_work_hours():
+            user_activity_after_work = True
+            log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
             return
 
         last_activity_time = time.time()
@@ -309,10 +376,16 @@ def on_mouse_event(x, y):
     Обработчик движения мыши/тачпада.
     Автоматически отслеживает как движения мыши, так и тачпада.
     """
-    global last_activity_time, is_simulating, initial_mouse_position, current_idle_threshold, absolute_anchor_position, is_performing_action, last_mouse_log_time
+    global last_activity_time, is_simulating, initial_mouse_position, current_idle_threshold, absolute_anchor_position, is_performing_action, last_mouse_log_time, user_activity_after_work
     
     with global_lock:
         if is_performing_action:
+            return
+        
+        # Проверка активности после рабочего дня
+        if CONFIG.get('exit_on_activity_after_work', True) and is_after_work() and not is_work_hours():
+            user_activity_after_work = True
+            log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
             return
             
         last_activity_time = time.time()
@@ -331,11 +404,17 @@ def on_mouse_click(x, y, button, pressed):
     Обработчик кликов мыши/тачпада.
     Автоматически отслеживает как клики мыши, так и тапы тачпада.
     """
-    global last_activity_time, is_simulating, current_idle_threshold, absolute_anchor_position, is_performing_action
+    global last_activity_time, is_simulating, current_idle_threshold, absolute_anchor_position, is_performing_action, user_activity_after_work
     if pressed:
         with global_lock:
             if is_performing_action:
                 log(f"Игнорирование симулированного клика мыши: {button}", 'DEBUG')
+                return
+            
+            # Проверка активности после рабочего дня
+            if CONFIG.get('exit_on_activity_after_work', True) and is_after_work() and not is_work_hours():
+                user_activity_after_work = True
+                log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
                 return
                 
             last_activity_time = time.time()
@@ -489,11 +568,24 @@ def control_tab_press():
 
 def simulate_activity():
     """Основной цикл симуляции активности"""
-    global last_activity_time, is_simulating, initial_mouse_position, current_idle_threshold, absolute_anchor_position, lunch_sequence_executed
+    global last_activity_time, is_simulating, initial_mouse_position, current_idle_threshold, absolute_anchor_position, lunch_sequence_executed, shutdown_cancelled, user_activity_after_work
     
     last_burst_time = time.time()
     
     while True:
+        # Проверка активности пользователя после работы
+        if user_activity_after_work:
+            log("🚪 Завершение программы из-за активности пользователя после рабочего дня")
+            print("\n" + "=" * 70)
+            print("🚪 ОБНАРУЖЕНА АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ")
+            print("=" * 70)
+            print("Программа завершена без блокировки/выключения компьютера")
+            if CONFIG['verbose_logging']:
+                print(f"📄 Лог сохранён в файл: {log_file_path}")
+            print("=" * 70)
+            time.sleep(1)
+            os._exit(0)
+        
         # Проверяем режим работы
         in_work_hours = is_work_hours()
         on_break, break_type = is_break_time()
@@ -525,6 +617,22 @@ def simulate_activity():
                 # Если мы ПОСЛЕ работы и активность отключена - завершаем программу
                 if is_after_work():
                     log(f"🏁 Рабочий день завершен. Программа останавливается (режим: {CONFIG['afterhours_mode']})")
+                    
+                    # Показываем предупреждение, если включено
+                    should_proceed = True
+                    if CONFIG.get('show_shutdown_warning', True):
+                        print(f"\n⏰ Показ предупреждения о завершении работы...")
+                        log("⏰ Показ предупреждения о завершении работы")
+                        should_proceed = show_shutdown_warning()
+                    
+                    if not should_proceed or shutdown_cancelled:
+                        log("✋ Завершение работы отменено пользователем")
+                        print("\n✋ Завершение работы отменено")
+                        # Продолжаем работу в режиме ожидания
+                        time.sleep(60)
+                        shutdown_cancelled = False
+                        continue
+                    
                     print("\n" + "=" * 70)
                     print("🏁 РАБОЧИЙ ДЕНЬ ЗАВЕРШЕН")
                     print("=" * 70)
@@ -538,8 +646,7 @@ def simulate_activity():
                     # Выключение или блокировка компьютера
                     if CONFIG.get('shutdown_on_exit', False):
                         print("🔌 ВЫКЛЮЧЕНИЕ КОМПЬЮТЕРА...")
-                        print("⚠️  ВНИМАНИЕ: Компьютер будет выключен через 2 секунды!")
-                        time.sleep(2)
+                        time.sleep(1)
                         shutdown_computer()
                     elif CONFIG.get('lock_on_exit', True):
                         print("🔒 Блокировка компьютера...")
