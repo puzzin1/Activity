@@ -824,7 +824,7 @@ def show_stats():
         time.sleep(300)  # Каждые 5 минут
         if len(action_history) > 0:
             recent = [a for a in action_history if time.time() - a[1] < 3600]
-            print(f"\n[Статистика] Действий за последний час: {len(recent)}")
+            log(f"[Статистика] Действий за последний час: {len(recent)}")
             if len(action_history) > 100:
                 action_history.clear()
 
