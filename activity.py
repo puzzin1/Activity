@@ -2,6 +2,7 @@ import time
 import random
 import os
 import sys
+import signal
 import platform
 import subprocess
 import tkinter as tk
@@ -858,7 +859,12 @@ if __name__ == "__main__":
     print(f"🖱️  Отслеживание: Мышь + Тачпад + Клавиатура")
     print()
     
-    print(f"⏰ РАСПИСАНИЕ НА СЕГОДНЯ:")
+    # Индикатор пятницы
+    day_indicator = ""
+    if SCHEDULE.get('is_friday', False):
+        day_indicator = " 🎉 ПЯТНИЦА!"
+    
+    print(f"⏰ РАСПИСАНИЕ НА СЕГОДНЯ:{day_indicator}")
     print(f"  • Рабочее время: {SCHEDULE['work_start']} - {SCHEDULE['work_end']}")
     print(f"  • Обед: {SCHEDULE['lunch_start']} - {SCHEDULE['lunch_end']} " +
           f"({time_str_to_minutes(SCHEDULE['lunch_end']) - time_str_to_minutes(SCHEDULE['lunch_start'])} мин)")
@@ -950,6 +956,17 @@ if __name__ == "__main__":
     print()
     print("Для остановки нажмите Ctrl+C")
     print()
+    
+    # === ОБРАБОТКА ЗАВЕРШЕНИЯ ===
+    # Флаг для корректного завершения
+    running = True
+    
+    def signal_handler(sig, frame):
+        """Обработчик сигнала Ctrl+C"""
+        global running
+        running = False
+    
+    signal.signal(signal.SIGINT, signal_handler)
 
     # === СОХРАНЕНИЕ ИНФОРМАЦИОННОЙ ЧАСТИ В ЛОГ ===
     if CONFIG['verbose_logging']:
@@ -960,7 +977,11 @@ if __name__ == "__main__":
         log(f"Отслеживание: Мышь + Тачпад + Клавиатура")
         log("")
         
-        log("РАСПИСАНИЕ НА СЕГОДНЯ:")
+        day_log_indicator = ""
+        if SCHEDULE.get('is_friday', False):
+            day_log_indicator = " (ПЯТНИЦА - короткий день)"
+        
+        log(f"РАСПИСАНИЕ НА СЕГОДНЯ:{day_log_indicator}")
         log(f"  • Рабочее время: {SCHEDULE['work_start']} - {SCHEDULE['work_end']}")
         log(f"  • Обед: {SCHEDULE['lunch_start']} - {SCHEDULE['lunch_end']} " +
             f"({time_str_to_minutes(SCHEDULE['lunch_end']) - time_str_to_minutes(SCHEDULE['lunch_start'])} мин)")
@@ -1053,24 +1074,29 @@ if __name__ == "__main__":
         log(f"Начальная позиция мыши: {initial_mouse_position}")
         log("=" * 70)
 
+    # Главный цикл - ждем завершения
     try:
-        keyboard_listener.join()
+        while running:
+            time.sleep(0.5)
     except KeyboardInterrupt:
-        print("\n\n🛑 Программа остановлена пользователем")
-        if CONFIG['verbose_logging']:
-            print(f"📄 Лог сохранён в файл: {log_file_path}")
-            log("")
-            log("=" * 70)
-            log(f"Программа остановлена пользователем. Всего действий: {len(action_history)}")
-            log("=" * 70)
-        
-        # Выключение или блокировка компьютера при ручной остановке
-        if CONFIG.get('shutdown_on_exit', False):
-            print("🔌 ВЫКЛЮЧЕНИЕ КОМПЬЮТЕРА...")
-            print("⚠️  ВНИМАНИЕ: Компьютер будет выключен через 2 секунды!")
-            time.sleep(2)
-            shutdown_computer()
-        elif CONFIG.get('lock_on_exit', True):
-            print("🔒 Блокировка компьютера...")
-            time.sleep(1)
-            lock_computer()
+        pass
+    
+    # Обработка завершения
+    print("\n\n🛑 Программа остановлена пользователем")
+    if CONFIG['verbose_logging']:
+        print(f"📄 Лог сохранён в файл: {log_file_path}")
+        log("")
+        log("=" * 70)
+        log(f"Программа остановлена пользователем. Всего действий: {len(action_history)}")
+        log("=" * 70)
+    
+    # Выключение или блокировка компьютера при ручной остановке
+    if CONFIG.get('shutdown_on_exit', False):
+        print("🔌 ВЫКЛЮЧЕНИЕ КОМПЬЮТЕРА...")
+        print("⚠️  ВНИМАНИЕ: Компьютер будет выключен через 2 секунды!")
+        time.sleep(2)
+        shutdown_computer()
+    elif CONFIG.get('lock_on_exit', True):
+        print("🔒 Блокировка компьютера...")
+        time.sleep(1)
+        lock_computer()

@@ -112,7 +112,7 @@ DEFAULT_CONFIG = {
     # ВАЖНО: Блокировка происходит как при автоматическом завершении в конце
     # рабочего дня, так и при ручной остановке через Ctrl+C
     
-    'shutdown_on_exit': True,
+    'shutdown_on_exit': False,
     # Принудительно выключить компьютер при завершении программы (без запроса).
     # True - компьютер будет выключен при завершении работы
     # False - только блокировка (если включена) или просто завершение программы
@@ -215,6 +215,15 @@ DEFAULT_CONFIG = {
     'work_end_max': '18:20',
     # Самое позднее время окончания рабочего дня (формат 'ЧЧ:ММ').
     # Имитирует естественный уход с работы в разное время.
+    
+    # --- СПЕЦИАЛЬНОЕ РАСПИСАНИЕ ДЛЯ ПЯТНИЦЫ ---
+    'friday_work_end_min': '16:35',
+    # Самое раннее время окончания рабочего дня в ПЯТНИЦУ (формат 'ЧЧ:ММ').
+    # По пятницам рабочий день обычно короче.
+    
+    'friday_work_end_max': '16:55',
+    # Самое позднее время окончания рабочего дня в ПЯТНИЦУ (формат 'ЧЧ:ММ').
+    # Создает вариативность ухода с работы в пятницу.
     
     # ========================================================================
     # ПЕРЕРЫВЫ
@@ -329,6 +338,8 @@ def generate_schedule(config):
     - Обеденный перерыв
     - Короткие перерывы (туалет, кофе и т.д.)
     
+    Для ПЯТНИЦЫ используется специальное расписание окончания работы.
+    
     Все перерывы распределяются равномерно в течение дня для естественности.
     
     Args:
@@ -341,18 +352,31 @@ def generate_schedule(config):
             - lunch_start: время начала обеда
             - lunch_end: время окончания обеда
             - breaks: список коротких перерывов
+            - is_friday: флаг, является ли день пятницей
     """
     schedule = {}
+    
+    # Проверяем, сегодня ли пятница (weekday: 0=Пн, 1=Вт, 2=Ср, 3=Чт, 4=Пт)
+    is_friday = datetime.now().weekday() == 4
+    schedule['is_friday'] = is_friday
     
     # 1. Определяем рабочее время
     work_start = random.randint(
         time_str_to_minutes(config['work_start_min']),
         time_str_to_minutes(config['work_start_max'])
     )
-    work_end = random.randint(
-        time_str_to_minutes(config['work_end_min']),
-        time_str_to_minutes(config['work_end_max'])
-    )
+    
+    # Для пятницы используем специальное время окончания
+    if is_friday:
+        work_end = random.randint(
+            time_str_to_minutes(config['friday_work_end_min']),
+            time_str_to_minutes(config['friday_work_end_max'])
+        )
+    else:
+        work_end = random.randint(
+            time_str_to_minutes(config['work_end_min']),
+            time_str_to_minutes(config['work_end_max'])
+        )
     
     schedule['work_start'] = minutes_to_time_str(work_start)
     schedule['work_end'] = minutes_to_time_str(work_end)
