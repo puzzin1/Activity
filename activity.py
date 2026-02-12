@@ -434,11 +434,21 @@ def move_mouse_naturally(target_x, target_y):
     dy = target_y - start_pos[1]
     steps = CONFIG['smooth_move_steps']
     
-    global is_performing_action
+    global is_performing_action, is_simulating, last_activity_time
     with global_lock:
-        is_performing_action = True 
+        is_performing_action = True
+        action_start_time = last_activity_time
     
     for step in range(steps):
+        # Проверяем активность пользователя на каждом шаге
+        with global_lock:
+            if last_activity_time > action_start_time:
+                # Пользователь проявил активность - прерываем движение
+                is_performing_action = False
+                is_simulating = False
+                log(f"⚠️ Движение мыши прервано активностью пользователя (шаг {step}/{steps})", 'INFO')
+                return
+        
         t = step / steps
         if CONFIG['natural_behavior']:
             # Кривая ease-in-out для более естественного движения
@@ -457,7 +467,7 @@ def move_mouse_naturally(target_x, target_y):
     mouse_controller.position = (target_x, target_y)
 
     with global_lock:
-        is_performing_action = False 
+        is_performing_action = False
 
 def random_mouse_move():
     """Случайное движение мыши в пределах заданного диапазона"""
@@ -496,7 +506,7 @@ def random_mouse_move():
 
 def random_arrow_press():
     """Нажатие клавиш-стрелок (имитация прокрутки/навигации)"""
-    global is_performing_action
+    global is_performing_action, is_simulating, last_activity_time
 
     if CONFIG['natural_behavior']:
         # Больший вес для up/down (вертикальная прокрутка популярнее)
@@ -509,9 +519,20 @@ def random_arrow_press():
     repetitions = random.randint(CONFIG['min_key_presses'], CONFIG['max_key_presses'])
     log(f"Нажатие стрелки: {arrow} (x{repetitions})")
     
-    with global_lock: is_performing_action = True
+    with global_lock: 
+        is_performing_action = True
+        action_start_time = last_activity_time  # Запоминаем время начала действия
     
     for i in range(repetitions):
+        # Проверяем, не было ли активности пользователя
+        with global_lock:
+            if last_activity_time > action_start_time:
+                # Пользователь проявил активность - прерываем серию
+                log(f"⚠️ Серия нажатий прервана активностью пользователя (выполнено {i}/{repetitions})", 'INFO')
+                is_performing_action = False
+                is_simulating = False
+                return
+        
         keyboard_controller.press(arrow)
         time.sleep(random.uniform(0.05, 0.15))
         keyboard_controller.release(arrow)
@@ -550,13 +571,26 @@ def safe_key_press():
 
 def control_tab_press():
     """Нажатие Ctrl+Tab (переключение вкладок)"""
-    global is_performing_action
+    global is_performing_action, is_simulating, last_activity_time
     log(f"Нажатие Ctrl+Tab")
     
-    with global_lock: is_performing_action = True
+    with global_lock: 
+        is_performing_action = True
+        action_start_time = last_activity_time
     
     keyboard_controller.press(Key.ctrl_l)
-    time.sleep(random.uniform(0.05, 0.15)) 
+    time.sleep(random.uniform(0.05, 0.15))
+    
+    # Проверяем активность пользователя перед нажатием Tab
+    with global_lock:
+        if last_activity_time > action_start_time:
+            # Пользователь проявил активность - отменяем действие
+            keyboard_controller.release(Key.ctrl_l)
+            is_performing_action = False
+            is_simulating = False
+            log(f"⚠️ Ctrl+Tab прерван активностью пользователя", 'INFO')
+            return
+    
     keyboard_controller.press(Key.tab)
     time.sleep(random.uniform(0.1, 0.2))
     keyboard_controller.release(Key.tab)
