@@ -389,6 +389,7 @@ def on_mouse_event(x, y):
             log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
             return
             
+        # Обновляем время активности - программа не будет действовать минимум 60 секунд
         last_activity_time = time.time()
         initial_mouse_position = (x, y) 
         current_idle_threshold = None
@@ -673,7 +674,12 @@ def simulate_activity():
                 CONFIG['afterhours_burst_interval_max'] * 60
             )
             
-            if time_since_burst >= burst_interval:
+            # Проверяем, прошло ли минимум 60 секунд с последней активности пользователя
+            MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60
+            with global_lock:
+                time_since_user_activity = time.time() - last_activity_time
+            
+            if time_since_burst >= burst_interval and time_since_user_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
                 burst_duration = random.uniform(
                     CONFIG['afterhours_burst_duration_min'],
                     CONFIG['afterhours_burst_duration_max']
@@ -711,6 +717,11 @@ def simulate_activity():
                 
                 last_burst_time = time.time()
                 log(f"{time_indicator} Всплеск активности завершен. Следующий через {burst_interval/60:.1f} мин")
+            elif time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+                # Ждем, пока не пройдет минимальная задержка после активности пользователя
+                remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_user_activity
+                log(f"⏸️  Ожидание после активности пользователя: {remaining:.1f} сек", 'DEBUG')
+                time.sleep(10)
             
             time.sleep(10)
             continue
@@ -738,8 +749,15 @@ def simulate_activity():
                 current_idle_threshold_local = current_idle_threshold
             log(f"Установлен новый порог бездействия: {current_idle_threshold_local} сек", 'DEBUG')
         
+        # КРИТИЧЕСКИ ВАЖНО: Минимальная задержка 60 секунд после любой активности пользователя
+        MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60
+        
         # Проверка необходимости симуляции
-        if is_simulating_local or time_since_last_activity >= current_idle_threshold_local:
+        # Программа начинает действовать только если:
+        # 1. Прошло минимум 60 секунд с последней активности пользователя
+        # 2. И прошло достаточно времени согласно порогу бездействия
+        if time_since_last_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY and \
+           (is_simulating_local or time_since_last_activity >= current_idle_threshold_local):
             
             # Начало симуляции
             if not is_simulating_local:
@@ -811,9 +829,15 @@ def simulate_activity():
                  with global_lock:
                     if not is_simulating:
                         log("Симуляция прервана активностью пользователя.", 'INFO')
-                    
-            remaining = current_idle_threshold_local - time_since_last_activity
-            log(f"Ожидание бездействия. Осталось: {remaining:.1f} сек", 'DEBUG')
+            
+            # Показываем оставшееся время с учетом минимальной задержки 60 сек
+            MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60
+            if time_since_last_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+                remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_last_activity
+                log(f"Ожидание после активности пользователя. Осталось: {remaining:.1f} сек", 'DEBUG')
+            else:
+                remaining = current_idle_threshold_local - time_since_last_activity
+                log(f"Ожидание бездействия. Осталось: {remaining:.1f} сек", 'DEBUG')
             
             time.sleep(1)
 
@@ -929,8 +953,13 @@ if __name__ == "__main__":
         print(f"  • Ввод последовательности: ✗ (отключено)")
     
     print()
-    print(f"🔌 ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ (Ctrl+C):")
-    print(f"  • Действие: Просто завершение программы")
+    print(f"🔌 ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ:")
+    if CONFIG.get('shutdown_on_exit', False):
+        print(f"  • Действие: ⚠️  ВЫКЛЮЧЕНИЕ компьютера (принудительное)")
+    elif CONFIG.get('lock_on_exit', True):
+        print(f"  • Действие: 🔒 Блокировка компьютера")
+    else:
+        print(f"  • Действие: Просто завершение программы")
     
     print("=" * 70)
     
@@ -1040,8 +1069,13 @@ if __name__ == "__main__":
             log(f"  • Ввод последовательности: ✗ (отключено)")
         
         log("")
-        log("ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ (Ctrl+C):")
-        log(f"  • Действие: Просто завершение программы")
+        log("ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ:")
+        if CONFIG.get('shutdown_on_exit', False):
+            log(f"  • Действие: ⚠️  ВЫКЛЮЧЕНИЕ компьютера (принудительное)")
+        elif CONFIG.get('lock_on_exit', True):
+            log(f"  • Действие: 🔒 Блокировка компьютера")
+        else:
+            log(f"  • Действие: Просто завершение программы")
         
         log("=" * 70)
         
@@ -1080,6 +1114,13 @@ if __name__ == "__main__":
         log(f"Программа остановлена пользователем. Всего действий: {len(action_history)}")
         log("=" * 70)
     
-    # При нажатии Ctrl-C программа просто завершается
-    print("👋 Программа завершена. До свидания!")
-    sys.exit(0)
+    # Выключение или блокировка компьютера при ручной остановке
+    if CONFIG.get('shutdown_on_exit', False):
+        print("🔌 ВЫКЛЮЧЕНИЕ КОМПЬЮТЕРА...")
+        print("⚠️  ВНИМАНИЕ: Компьютер будет выключен через 2 секунды!")
+        time.sleep(2)
+        shutdown_computer()
+    elif CONFIG.get('lock_on_exit', True):
+        print("🔒 Блокировка компьютера...")
+        time.sleep(1)
+        lock_computer()
