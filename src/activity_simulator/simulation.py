@@ -149,21 +149,21 @@ def type_key_sequence(sequence):
                 keyboard_controller.press(Key.enter)
                 time.sleep(0.05)
                 keyboard_controller.release(Key.enter)
-                log(f"  • Нажата клавиша: Enter")
+                log(f"  • Нажата клавиша")
                 time.sleep(random.uniform(0.1, 0.3))
 
             elif element == "Tab":
                 keyboard_controller.press(Key.tab)
                 time.sleep(0.05)
                 keyboard_controller.release(Key.tab)
-                log(f"  • Нажата клавиша: Tab")
+                log(f"  • Нажата клавиша")
                 time.sleep(random.uniform(0.1, 0.3))
 
             elif element == "Space":
                 keyboard_controller.press(Key.space)
                 time.sleep(0.05)
                 keyboard_controller.release(Key.space)
-                log(f"  • Нажата клавиша: Space")
+                log(f"  • Нажата клавиша")
                 time.sleep(random.uniform(0.05, 0.15))
 
             else:
@@ -334,7 +334,7 @@ def random_arrow_press():
     arrow = random.choice(arrows)
 
     repetitions = random.randint(CONFIG['min_key_presses'], CONFIG['max_key_presses'])
-    log(f"Нажатие стрелки: {arrow} (x{repetitions})")
+    log(f"Нажатие стрелки (x{repetitions})")
 
     with global_lock:
         is_performing_action = True
@@ -375,7 +375,7 @@ def random_mouse_click():
 def safe_key_press():
     """Нажатие безопасной клавиши (Shift) - не производит побочных эффектов"""
     global is_performing_action
-    log(f"Нажатие безопасной клавиши (Shift)")
+    log(f"Нажатие безопасной клавиши")
 
     with global_lock: is_performing_action = True
 
@@ -389,7 +389,7 @@ def safe_key_press():
 def control_tab_press():
     """Нажатие Ctrl+Tab (переключение вкладок)"""
     global is_performing_action, is_simulating, last_activity_time
-    log(f"Нажатие Ctrl+Tab")
+    log(f"Нажатие комбинации клавиш")
 
     with global_lock:
         is_performing_action = True
@@ -405,7 +405,7 @@ def control_tab_press():
             keyboard_controller.release(Key.ctrl_l)
             is_performing_action = False
             is_simulating = False
-            log(f"⚠️ Ctrl+Tab прерван активностью пользователя", 'INFO')
+            log(f"⚠️ Комбинация клавиш прервана активностью пользователя", 'INFO')
             return
 
     keyboard_controller.press(Key.tab)

@@ -17,7 +17,7 @@ def on_keyboard_event(key):
     """Обработчик нажатий клавиш клавиатуры"""
     with simulation.global_lock:
         if simulation.is_performing_action:
-            simulation.log(f"Игнорирование симулированного события клавиатуры: {key}", 'DEBUG')
+            simulation.log(f"Игнорирование симулированного события клавиатуры", 'DEBUG')
             return
 
         # Проверка активности после рабочего дня
@@ -30,7 +30,7 @@ def on_keyboard_event(key):
         simulation.current_idle_threshold = None
         simulation.is_simulating = False
         simulation.absolute_anchor_position = None
-        simulation.log(f"Обнаружена активность клавиатуры: {key}", 'DEBUG')
+        simulation.log(f"Обнаружена активность клавиатуры", 'DEBUG')
 
 def on_mouse_event(x, y):
     """
@@ -56,7 +56,7 @@ def on_mouse_event(x, y):
 
         current_time = time.time()
         if current_time - simulation.last_mouse_log_time >= 1.0:
-            simulation.log(f"Обнаружено движение мыши пользователем: ({x}, {y})", 'DEBUG')
+            simulation.log(f"Обнаружено движение мыши пользователем", 'DEBUG')
             simulation.last_mouse_log_time = current_time
 
 def on_mouse_click(x, y, button, pressed):
@@ -67,7 +67,7 @@ def on_mouse_click(x, y, button, pressed):
     if pressed:
         with simulation.global_lock:
             if simulation.is_performing_action:
-                simulation.log(f"Игнорирование симулированного клика мыши: {button}", 'DEBUG')
+                simulation.log(f"Игнорирование симулированного клика мыши", 'DEBUG')
                 return
 
             # Проверка активности после рабочего дня
@@ -80,4 +80,4 @@ def on_mouse_click(x, y, button, pressed):
             simulation.is_simulating = False
             simulation.current_idle_threshold = None
             simulation.absolute_anchor_position = None
-            simulation.log(f"Обнаружен клик мыши: {button} в ({x}, {y})", 'DEBUG')
+            simulation.log(f"Обнаружен клик мыши", 'DEBUG')
