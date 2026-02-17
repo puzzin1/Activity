@@ -42,8 +42,10 @@
 ### 📦 Установка зависимостей
 ```bash
 # Основные зависимости
-pip install pynput pydantic
+pip install pynput pyyaml
 ```
+
+**Примечание:** Библиотека `pyyaml` требуется для работы с конфигурацией YAML. Если она не установлена, программа будет использовать настройки по умолчанию.
 
 ### 🖥️ Запуск программы
 
@@ -72,8 +74,8 @@ activity-simulator
 
 ### 🎯 Первый запуск
 При первом запуске программа автоматически:
-1. **📄 Создает** файл конфигурации `activity_config_YYYYMMDD.json`
-2. **📅 Генерирует** расписание на день с перерывами
+1. **📄 Проверяет** наличие `config.yaml` в корневой директории (создает при отсутствии с настройками по умолчанию)
+2. **📅 Создает** ежедневный файл конфигурации `activity_config_YYYYMMDD.json` с расписанием на день
 3. **ℹ️ Показывает** информацию о настройках и расписании
 4. **▶️ Начинает** работу в соответствующем режиме
 
@@ -84,66 +86,71 @@ activity-simulator
 
 ## ⚙️ Конфигурация
 
-### 📄 Файл конфигурации
-Программа создает JSON-файл конфигурации автоматически:
+### 📄 Файлы конфигурации
+Программа использует два уровня конфигурации:
 
-**Примечание для разработчиков:** Исходные настройки по умолчанию определены в файле `activity_simulator/config.py` в словаре `DEFAULT_CONFIG`. При первом запуске дня эти настройки копируются в JSON-файл, который затем используется программой.
+#### 1. **Основной файл настроек** (`config.yaml`)
+- **Расположение:** Корневая директория проекта
+- **Назначение:** Содержит все настройки программы с подробными комментариями
+- **Редактирование:** Изменяется вручную, влияет на все последующие запуски
+- **Создание:** При первом запуске с установленным PyYAML создается автоматически
+
+#### 2. **Ежедневные файлы конфигурации** (`activity_config_YYYYMMDD.json`)
+- **Назначение:** Содержат расписание на конкретный день, сгенерированное на основе `config.yaml`
+- **Создание:** Автоматически при первом запуске каждого дня
+- **Повторное использование:** Если файл уже существует, используется повторно
 
 ```
-activity_config_20260217.json
-└── config:     Основные настройки программы
-└── schedule:   Сгенерированное расписание на день
-└── created_at: Дата создания конфига
+config.yaml (корневая директория)      →      activity_config_20260217.json
+├── Все настройки программы                  ├── config:     Настройки из config.yaml
+├── Подробные комментарии                   ├── schedule:   Расписание на день
+└── Редактируется вручную                   └── created_at: Дата создания
 ```
+
+**Примечание для разработчиков:** Исходные настройки по умолчанию определены в файле `activity_simulator/config.py` в словаре `DEFAULT_CONFIG`. Они используются как резервный вариант если YAML недоступен.
 
 ### 🎮 Основные параметры
 
 #### Параметры симуляции
-```json
-{
-  "min_idle_time": 30,           // Мин. время бездействия (сек)
-  "max_idle_time": 70,           // Макс. время бездействия (сек)
-  "min_action_interval": 3,      // Мин. интервал между действиями (сек)
-  "max_action_interval": 20,     // Макс. интервал между действиями (сек)
-  "max_mouse_range": 50,         // Диапазон движения мыши (пикс)
-  "natural_behavior": true       // Естественное поведение (плавные движения)
-}
+```yaml
+min_idle_time: 30           # Мин. время бездействия (сек)
+max_idle_time: 70           # Макс. время бездействия (сек)
+min_action_interval: 3      # Мин. интервал между действиями (сек)
+max_action_interval: 20     # Макс. интервал между действиями (сек)
+max_mouse_range: 50         # Диапазон движения мыши (пикс)
+natural_behavior: true      # Естественное поведение (плавные движения)
 ```
 
 #### Веса действий
-```json
-{
-  "use_mouse_move": true,         // Включить движение мыши
-  "use_keyboard": true,           // Включить нажатие стрелок
-  "use_mouse_click": true,        // Включить клики мыши
+```yaml
+use_mouse_move: true         # Включить движение мыши
+use_keyboard: true           # Включить нажатие стрелок
+use_mouse_click: true        # Включить клики мыши
 
-  "action_weight_mouse_move": 3,  // Вероятность движения мыши (чем больше, тем чаще)
-  "action_weight_keyboard": 3,    // Вероятность нажатия стрелок
-  "action_weight_ctrl_tab": 1,    // Вероятность Ctrl+Tab
-  "action_weight_mouse_click": 2, // Вероятность кликов
-  "action_weight_safe_key": 2     // Вероятность безопасной клавиши (Shift)
-}
+action_weight_mouse_move: 3  # Вероятность движения мыши (чем больше, тем чаще)
+action_weight_keyboard: 3    # Вероятность нажатия стрелок
+action_weight_ctrl_tab: 1    # Вероятность Ctrl+Tab
+action_weight_mouse_click: 2 # Вероятность кликов
+action_weight_safe_key: 2    # Вероятность безопасной клавиши (Shift)
 ```
 
 ### ⏰ Расписание работы
-```json
-{
-  "work_start_min": "08:45",     // Раннее начало работы
-  "work_start_max": "09:05",     // Позднее начало работы
-  "work_end_min": "18:00",       // Раннее окончание работы (Пн-Чт)
-  "work_end_max": "18:20",       // Позднее окончание работы (Пн-Чт)
+```yaml
+work_start_min: '08:45'     # Раннее начало работы
+work_start_max: '09:05'     # Позднее начало работы
+work_end_min: '18:00'       # Раннее окончание работы (Пн-Чт)
+work_end_max: '18:20'       # Позднее окончание работы (Пн-Чт)
 
-  "friday_work_end_min": "16:35", // Раннее окончание в ПЯТНИЦУ
-  "friday_work_end_max": "16:55", // Позднее окончание в ПЯТНИЦУ
+friday_work_end_min: '16:35' # Раннее окончание в ПЯТНИЦУ
+friday_work_end_max: '16:55' # Позднее окончание в ПЯТНИЦУ
 
-  "lunch_start_min": "12:00",    // Раннее начало обеда
-  "lunch_end_max": "14:30",      // Позднее окончание обеда
-  "lunch_duration_min": 20,      // Мин. длительность обеда (мин)
-  "lunch_duration_max": 30,      // Макс. длительность обеда (мин)
+lunch_start_min: '12:00'    # Раннее начало обеда
+lunch_end_max: '14:30'      # Позднее окончание обеда
+lunch_duration_min: 20      # Мин. длительность обеда (мин)
+lunch_duration_max: 30      # Макс. длительность обеда (мин)
 
-  "total_break_min": 40,         // Мин. общее время коротких перерывов (мин)
-  "total_break_max": 80          // Макс. общее время коротких перерывов (мин)
-}
+total_break_min: 40         # Мин. общее время коротких перерывов (мин)
+total_break_max: 80         # Макс. общее время коротких перерывов (мин)
 ```
 
 **Особенности расписания:**
@@ -152,12 +159,10 @@ activity_config_20260217.json
 - ⏰ **Случайное время** — в заданных пределах для естественности
 
 #### 🍽️ Действия после обеда
-```json
-{
-  "after_lunch_action": false,               // Включить ввод последовательности после обеда
-  "after_lunch_sequence": "password{Enter}", // Последовательность клавиш
-  "after_lunch_delay": 5                     // Задержка после обеда перед вводом (сек)
-}
+```yaml
+after_lunch_action: false               # Включить ввод последовательности после обеда
+after_lunch_sequence: 'password{Enter}' # Последовательность клавиш
+after_lunch_delay: 5                    # Задержка после обеда перед вводом (сек)
 ```
 
 **Специальные клавиши:**
@@ -171,13 +176,11 @@ activity_config_20260217.json
 - `"user{Tab}{Tab}pass{Enter}"` — user, дважды Tab, пароль, Enter
 
 #### 🔒 Завершение работы
-```json
-{
-  "lock_on_exit": true,           // Блокировать компьютер при автоматическом завершении
-  "shutdown_on_exit": false,      // Выключить компьютер при автоматическом завершении
-  "show_shutdown_warning": true,  // Показать предупреждение перед блокировкой/выключением
-  "shutdown_warning_time": 30     // Время показа предупреждения (сек)
-}
+```yaml
+lock_on_exit: true           # Блокировать компьютер при автоматическом завершении
+shutdown_on_exit: false      # Выключить компьютер при автоматическом завершении
+show_shutdown_warning: true  # Показать предупреждение перед блокировкой/выключением
+shutdown_warning_time: 30    # Время показа предупреждения (сек)
 ```
 
 **Примечания:**
@@ -288,10 +291,8 @@ activity_config_20260217.json
 - ⌨️ Все нажатия клавиш
 
 ### 🔧 Отключение функции
-```json
-{
-  "exit_on_activity_after_work": false
-}
+```yaml
+exit_on_activity_after_work: false
 ```
 
 ---
@@ -322,44 +323,36 @@ activity_log_20260217_143022.txt
 ### 🎯 Режимы для разных сценариев
 
 #### 1. Минимальная заметность
-```json
-{
-  "use_mouse_click": false,
-  "action_weight_ctrl_tab": 0,
-  "max_mouse_range": 30,
-  "min_idle_time": 40,
-  "max_idle_time": 90
-}
+```yaml
+use_mouse_click: false
+action_weight_ctrl_tab: 0
+max_mouse_range: 30
+min_idle_time: 40
+max_idle_time: 90
 ```
 
 #### 2. Максимальная активность
-```json
-{
-  "min_idle_time": 20,
-  "max_idle_time": 40,
-  "min_action_interval": 2,
-  "max_action_interval": 10,
-  "action_weight_mouse_move": 5,
-  "action_weight_keyboard": 5
-}
+```yaml
+min_idle_time: 20
+max_idle_time: 40
+min_action_interval: 2
+max_action_interval: 10
+action_weight_mouse_move: 5
+action_weight_keyboard: 5
 ```
 
 #### 3. Только утренняя активность
-```json
-{
-  "afterhours_mode": "before_only",
-  "afterhours_burst_duration_min": 45,
-  "afterhours_burst_duration_max": 90
-}
+```yaml
+afterhours_mode: before_only
+afterhours_burst_duration_min: 45
+afterhours_burst_duration_max: 90
 ```
 
 #### 4. Безопасный режим (без кликов)
-```json
-{
-  "use_mouse_click": false,
-  "action_weight_mouse_click": 0,
-  "action_weight_ctrl_tab": 0
-}
+```yaml
+use_mouse_click: false
+action_weight_mouse_click: 0
+action_weight_ctrl_tab: 0
 ```
 
 ---
@@ -376,9 +369,10 @@ activity-simulator/
 │   └── 🛠️ utils.py                    # Вспомогательные функции
 ├── 🏃 activity.bat                    # Скрипт быстрого запуска (Windows)
 ├── 📄 pyproject.toml                  # Конфигурация Python-пакета
+├── ⚙️ config.yaml                     # Основной файл настроек (YAML)
 ├── 📖 README.md                       # Эта документация
 ├── 🧪 test_import.py                  # Тестовый скрипт импорта
-├── 📋 activity_config_*.json          # Конфигурация (создается автоматически)
+├── 📋 activity_config_*.json          # Ежедневная конфигурация (создается автоматически)
 └── 📊 activity_log_*.txt              # Лог-файл (создается автоматически)
 ```
 
@@ -400,9 +394,10 @@ activity-simulator/
 | **v10.0** | Безопасное завершение по Ctrl+C (без блокировки/выключения) | ✅ |
 | **v11.0** | Минимальная задержка 60 секунд, прерывание серий действий | ✅ |
 | **v12.0** | Пакетная структура, улучшенная документация | ✅ |
+| **v13.0** | YAML конфигурация, настройки в корне проекта, замена pydantic на pyyaml | ✅ |
 
-**Текущая версия:** v12.0 (пакетная структура)
-**Последние изменения:** Реорганизация в модульный пакет, обновление документации
+**Текущая версия:** v13.0 (YAML конфигурация)
+**Последние изменения:** Вынос настроек в YAML-файл в корне проекта, обновление документации
 
 ---
 
@@ -425,15 +420,17 @@ activity-simulator/
 <details>
 <summary><strong>Q: Как часто обновляется файл конфигурации?</strong></summary>
 
-**A:** Один раз в день. При первом запуске дня создается новый файл с новым расписанием.
+**A:** Разные файлы обновляются по-разному:
+- **`config.yaml`** (основные настройки) — не обновляется автоматически, редактируется вручную
+- **`activity_config_YYYYMMDD.json`** (ежедневное расписание) — создается один раз в день при первом запуске
 </details>
 
 <details>
 <summary><strong>Q: Можно ли изменить настройки во время работы?</strong></summary>
 
-**A:** Нет, нужно:
+**A:** Нет, настройки применяются только при запуске. Нужно:
 1. Нажать `Ctrl+C` для остановки
-2. Изменить `activity_config_YYYYMMDD.json`
+2. Изменить основной файл `config.yaml` (для постоянных изменений) ИЛИ ежедневный `activity_config_YYYYMMDD.json` (для изменений на один день)
 3. Запустить программу снова
 </details>
 
@@ -442,7 +439,7 @@ activity-simulator/
 <details>
 <summary><strong>Q: Безопасно ли хранить пароли в конфиге?</strong></summary>
 
-**A:** Файл конфигурации хранит пароли в открытом виде. Используйте с осторожностью. Рекомендуется использовать только для незначительных паролей или отключить функцию.
+**A:** Файл `config.yaml` хранит пароли в открытом виде. Используйте с осторожностью. Рекомендуется использовать только для незначительных паролей или отключить функцию.
 </details>
 
 <details>
@@ -456,12 +453,10 @@ activity-simulator/
 <details>
 <summary><strong>Q: Как отключить клики мыши?</strong></summary>
 
-**A:** Установите:
-```json
-{
-  "use_mouse_click": false,
-  "action_weight_mouse_click": 0
-}
+**A:** Установите в `config.yaml`:
+```yaml
+use_mouse_click: false
+action_weight_mouse_click: 0
 ```
 </details>
 
@@ -474,19 +469,20 @@ activity-simulator/
 <details>
 <summary><strong>Q: Программа слишком активна, как снизить?</strong></summary>
 
-**A:** Увеличьте параметры:
-```json
-{
-  "min_idle_time": 60,
-  "max_action_interval": 40
-}
+**A:** Увеличьте параметры в `config.yaml`:
+```yaml
+min_idle_time: 60
+max_action_interval: 40
 ```
 </details>
 
 <details>
 <summary><strong>Q: Как включить работу круглосуточно?</strong></summary>
 
-**A:** Установите `"afterhours_mode": "before_and_after"`.
+**A:** Установите в `config.yaml`:
+```yaml
+afterhours_mode: before_and_after
+```
 </details>
 
 <details>
@@ -520,9 +516,10 @@ activity-simulator/
 ### 🔧 Логи для диагностики
 При возникновении проблем приложите:
 1. 📄 Файл `activity_log_*.txt`
-2. ⚙️ Файл `activity_config_*.json`
-3. 🐍 Версию Python: `python --version`
-4. 💻 ОС и версию
+2. ⚙️ Файл `config.yaml` (основные настройки)
+3. 📋 Файл `activity_config_*.json` (ежедневное расписание)
+4. 🐍 Версию Python: `python --version`
+5. 💻 ОС и версию
 
 ### ⚠️ Известные ограничения
 - ❌ Не работает через SSH без X11
@@ -555,8 +552,8 @@ activity-simulator/
 
 <div align="center">
 
-**Версия:** 12.0 (пакетная структура)
+**Версия:** 13.0 (YAML конфигурация)
 **Дата:** 2024-2025
-**Файлы:** `src/activity_simulator/`, `activity.bat`, `pyproject.toml`
+**Файлы:** `src/activity_simulator/`, `activity.bat`, `pyproject.toml`, `config.yaml`
 
 </div>

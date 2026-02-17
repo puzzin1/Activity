@@ -8,6 +8,19 @@ import random
 import os
 from datetime import datetime
 
+# Попытка импорта YAML
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+    print("⚠️  Библиотека PyYAML не установлена. Используются настройки по умолчанию.")
+    print("   Установите PyYAML для работы с конфигурацией YAML:")
+    print("   pip install pyyaml")
+
+# Путь к файлу конфигурации YAML (в корневой директории проекта)
+YAML_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.yaml')
+
 
 # ============================================================================
 # НАСТРОЙКИ ПО УМОЛЧАНИЮ
@@ -280,6 +293,84 @@ DEFAULT_CONFIG = {
 
 
 # ============================================================================
+# ФУНКЦИИ ЗАГРУЗКИ YAML КОНФИГУРАЦИИ
+# ============================================================================
+
+def load_yaml_config():
+    """
+    Загружает конфигурацию из файла config.yaml.
+
+    Returns:
+        dict: Словарь с настройками из YAML или DEFAULT_CONFIG, если YAML недоступен
+    """
+    global DEFAULT_CONFIG
+
+    # Если YAML недоступен, возвращаем настройки по умолчанию
+    if not YAML_AVAILABLE:
+        print("⚠️  PyYAML не установлен, используем настройки по умолчанию")
+        return DEFAULT_CONFIG.copy()
+
+    # Проверяем существование файла
+    if not os.path.exists(YAML_CONFIG_PATH):
+        print(f"⚠️  Файл конфигурации {YAML_CONFIG_PATH} не найден")
+        print("   Создаем файл с настройками по умолчанию...")
+        # Пытаемся создать файл
+        if create_default_yaml():
+            print("   Файл создан. Используем настройки по умолчанию.")
+        else:
+            print("   Не удалось создать файл. Используем настройки по умолчанию.")
+        return DEFAULT_CONFIG.copy()
+
+    try:
+        with open(YAML_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+
+        if config is None:
+            print("⚠️  YAML файл пустой, используем настройки по умолчанию")
+            return DEFAULT_CONFIG.copy()
+
+        # Проверяем, что загружен словарь
+        if not isinstance(config, dict):
+            print("⚠️  YAML файл должен содержать словарь, используем настройки по умолчанию")
+            return DEFAULT_CONFIG.copy()
+
+        # Убедимся, что все ключи из DEFAULT_CONFIG присутствуют
+        default_config_copy = DEFAULT_CONFIG.copy()
+        for key, value in default_config_copy.items():
+            if key not in config:
+                print(f"⚠️  В YAML отсутствует ключ '{key}', используем значение по умолчанию")
+                config[key] = value
+
+        print(f"✅ Конфигурация загружена из {YAML_CONFIG_PATH}")
+        return config
+
+    except Exception as e:
+        print(f"⚠️  Ошибка загрузки YAML конфигурации: {e}")
+        print("   Используем настройки по умолчанию")
+        return DEFAULT_CONFIG.copy()
+
+
+def create_default_yaml():
+    """
+    Создает файл config.yaml с настройками по умолчанию.
+    """
+    if not YAML_AVAILABLE:
+        print("⚠️  Невозможно создать YAML файл: PyYAML не установлен")
+        return False
+
+    try:
+        with open(YAML_CONFIG_PATH, 'w', encoding='utf-8') as f:
+            yaml.dump(DEFAULT_CONFIG, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+        print(f"✅ Файл конфигурации создан: {YAML_CONFIG_PATH}")
+        print("   Отредактируйте его для настройки программы.")
+        return True
+    except Exception as e:
+        print(f"⚠️  Ошибка создания YAML файла: {e}")
+        return False
+
+
+# ============================================================================
 # ФУНКЦИИ РАБОТЫ С КОНФИГУРАЦИЕЙ
 # ============================================================================
 
@@ -494,7 +585,7 @@ def load_or_create_config():
             print(f"   Создание новой конфигурации...")
 
     # Создаем новую конфигурацию - сообщение только для нового файла
-    config = DEFAULT_CONFIG.copy()
+    config = load_yaml_config()
     schedule = generate_schedule(config)
 
     # Сохраняем в файл
