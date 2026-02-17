@@ -1,3 +1,34 @@
+Metadata-Version: 2.4
+Name: activity-simulator
+Version: 1.0.0
+Summary: Автоматическая симуляция пользовательской активности для предотвращения спящего режима
+Author: Activity Simulator
+License: MIT
+Project-URL: Homepage, https://github.com/user/activity-simulator
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: MacOS
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Utilities
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: pynput>=1.7.6
+Requires-Dist: pydantic>=2.0.0
+Provides-Extra: dev
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: flake8>=6.0.0; extra == "dev"
+Requires-Dist: mypy>=1.0.0; extra == "dev"
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
+
 # 🖥️ Программа Симуляции Активности
 
 Автоматическая симуляция пользовательской активности для предотвращения перехода компьютера в спящий режим и отображения статуса "отошел" в корпоративных системах.
@@ -70,9 +101,9 @@ pip install pynput
 
 ### Шаг 3: Проверка файлов
 Убедитесь, что у вас есть:
-- `src/activity_simulator/` - пакет с программой
+- `activity.py` - основная программа
+- `config_manager.py` - модуль конфигурации
 - `activity.bat` - скрипт быстрого запуска (Windows)
-- `pyproject.toml` - конфигурация пакета
 
 ---
 
@@ -88,21 +119,12 @@ activity.bat
 
 Или через командную строку:
 ```bash
-python -m activity_simulator.main
+python activity.py
 ```
 
 #### macOS / Linux
 ```bash
-python -m activity_simulator.main
-```
-
-#### После установки пакета
-```bash
-# Установить в режиме разработки
-pip install -e .
-
-# Запустить через консольный скрипт
-activity-simulator
+python activity.py
 ```
 
 ### Первый запуск
@@ -461,7 +483,7 @@ activity-simulator
 - ✅ Варианты внерабочего режима
 
 **Изменения:**
-- Модуль конфигурации `activity_simulator.config.py`
+- Файл `config_manager.py`
 - Параметры `action_weight_*`
 - Режимы: `disabled`, `before_only`, `before_and_after`
 - Документация в DEFAULT_CONFIG
@@ -673,23 +695,16 @@ A: Используйте файл `activity.bat` - просто дважды к
 
 ```
 activity-simulator/
-├── src/
-│   └── activity_simulator/         # Пакет программы
-│       ├── main.py                # Точка входа
-│       ├── simulation.py          # Движок симуляции
-│       ├── listeners.py           # Обработчики событий
-│       ├── config.py              # Управление конфигурацией
-│       └── utils.py               # Вспомогательные функции
-├── activity.bat                   # Скрипт быстрого запуска (Windows)
-├── pyproject.toml                 # Конфигурация пакета
-├── README.md                      # Документация (этот файл)
-├── test_import.py                 # Тестовый скрипт импорта
-├── activity_config_YYYYMMDD.json  # Конфигурация (создается автоматически)
+├── activity.py              # Основная программа
+├── config_manager.py        # Модуль управления конфигурацией
+├── activity.bat            # Скрипт быстрого запуска (Windows)
+├── README.md               # Документация (этот файл)
+├── activity_config_YYYYMMDD.json    # Конфигурация (создается автоматически)
 └── activity_log_YYYYMMDD_HHMMSS.txt # Лог-файл (создается автоматически)
 ```
 
 ---
 
-**Версия:** 12.0 (пакетная структура)
-**Дата:** 2024-2025
-**Файлы:** `src/activity_simulator/`, `activity.bat`, `pyproject.toml`
+**Версия:** 11.0  
+**Дата:** 2024-2025  
+**Файлы:** `activity.py`, `config_manager.py`, `activity.bat`
