@@ -55,12 +55,12 @@ pip install pynput pyyaml
 activity.bat
 
 # Или из командной строки:
-python -m activity_simulator.main
+python -m activity_simulator
 ```
 
 #### macOS / Linux
 ```bash
-python -m activity_simulator.main
+python -m activity_simulator
 ```
 
 #### После установки пакета (опционально)

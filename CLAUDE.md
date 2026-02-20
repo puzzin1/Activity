@@ -67,7 +67,7 @@ pip install -e .
 ### Запуск программы
 ```bash
 # Стандартный запуск (как модуль Python)
-python -m activity_simulator.main
+python -m activity_simulator
 
 # После установки пакета можно использовать консольный скрипт
 activity-simulator
@@ -118,7 +118,7 @@ python -m activity_simulator.config
 ## Навигация по кодовой базе
 
 ### Точки входа
-- **Основная программа**: `activity_simulator.main` → функция `main()` в модуле `main.py`
+- **Основная программа**: `activity_simulator` (как модуль Python) → функция `main()` в модуле `main.py`
 - **Консольный скрипт**: `activity-simulator` (после установки пакета) → указывает на `activity_simulator.main:main`
 - **Конфигурация**: `activity_simulator.config` (основной файл для настройки программы) → `load_or_create_config()` вызывается из `main.py`
 
