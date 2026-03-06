@@ -422,9 +422,10 @@ def control_tab_press():
 
 def simulate_activity():
     """Основной цикл симуляции активности"""
-    global last_activity_time, is_simulating, initial_mouse_position, current_idle_threshold, absolute_anchor_position, lunch_sequence_executed, shutdown_cancelled, user_activity_after_work
+    global last_activity_time, is_simulating, initial_mouse_position, current_idle_threshold, absolute_anchor_position, lunch_sequence_executed, shutdown_cancelled, user_activity_after_work, last_break_burst_time
 
     last_burst_time = time.time()
+    last_break_burst_time = time.time()
 
     while True:
         # Проверка активности пользователя после работы
@@ -585,8 +586,83 @@ def simulate_activity():
             if is_simulating:
                 with global_lock:
                     is_simulating = False
-                log(f"☕ Перерыв ({break_type}). Активность приостановлена.")
-            time.sleep(30)
+                log(f"☕ Перерыв ({break_type}). Переход в режим легкой активности.")
+
+            # Логика всплесков активности во время перерыва (аналогично внерабочему режиму)
+            time_since_break_burst = time.time() - last_break_burst_time
+            burst_interval = random.uniform(
+                CONFIG['afterhours_burst_interval_min'] * 60,
+                CONFIG['afterhours_burst_interval_max'] * 60
+            )
+
+            # Проверяем, прошло ли минимум 60 секунд с последней активности пользователя
+            MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60
+            with global_lock:
+                time_since_user_activity = time.time() - last_activity_time
+
+            if time_since_break_burst >= burst_interval and time_since_user_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+                burst_duration = random.uniform(
+                    CONFIG['afterhours_burst_duration_min'],
+                    CONFIG['afterhours_burst_duration_max']
+                )
+
+                log(f"☕ Перерыв ({break_type}): всплеск активности на {burst_duration:.0f} сек")
+
+                burst_end_time = time.time() + burst_duration
+
+                with global_lock:
+                    absolute_anchor_position = mouse_controller.position
+                    initial_mouse_position = mouse_controller.position
+                    is_simulating = True
+
+                burst_completed = False
+                break_ended = False
+
+                while time.time() < burst_end_time:
+                    # Проверяем, не закончился ли перерыв
+                    on_break_check, break_type_check = is_break_time()
+                    if not on_break_check:
+                        log(f"☕ Перерыв завершился. Выход из режима перерыва.")
+                        break_ended = True
+                        break
+
+                    # Выполняем легкую активность
+                    action = random.choice(['mouse_move', 'safe_key'])
+
+                    try:
+                        if action == 'mouse_move':
+                            random_mouse_move()
+                        elif action == 'safe_key':
+                            safe_key_press()
+                    except Exception as e:
+                        log(f"Ошибка при выполнении действия: {e}", 'ERROR')
+
+                    with global_lock:
+                        last_activity_time = time.time()
+
+                    time.sleep(random.uniform(2, 5))
+                else:
+                    # Цикл завершился без break (время всплеска истекло)
+                    burst_completed = True
+
+                with global_lock:
+                    is_simulating = False
+
+                if break_ended:
+                    # Перерыв закончился досрочно, не обновляем время последнего всплеска
+                    # и переходим к следующей итерации главного цикла
+                    continue
+
+                if burst_completed:
+                    last_break_burst_time = time.time()
+                    log(f"☕ Перерыв ({break_type}): всплеск активности завершен. Следующий через {burst_interval/60:.1f} мин")
+            elif time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+                # Ждем, пока не пройдет минимальная задержка после активности пользователя
+                remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_user_activity
+                log(f"⏸️  Ожидание после активности пользователя: {remaining:.1f} сек", 'DEBUG')
+                time.sleep(10)
+
+            time.sleep(10)
             continue
 
         # === ОБЫЧНЫЙ РАБОЧИЙ РЕЖИМ ===
