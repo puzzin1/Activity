@@ -244,6 +244,18 @@ def show_shutdown_warning():
 
 # === ФУНКЦИИ ВЫПОЛНЕНИЯ ДЕЙСТВИЙ ===
 
+def get_consecutive_safe_key_count():
+    """Возвращает количество подряд идущих safe_key действий в конце истории"""
+    global action_history
+    count = 0
+    # Идем с конца истории и считаем последовательные safe_key
+    for action_type, _ in reversed(action_history):
+        if action_type == 'safe_key':
+            count += 1
+        else:
+            break
+    return count
+
 def move_mouse_naturally(target_x, target_y):
     """Плавное перемещение мыши к целевой позиции"""
     start_pos = mouse_controller.position
@@ -251,7 +263,7 @@ def move_mouse_naturally(target_x, target_y):
     dy = target_y - start_pos[1]
     steps = CONFIG['smooth_move_steps']
 
-    global is_performing_action, is_simulating, last_activity_time
+    global is_performing_action, is_simulating, last_activity_time, action_history
     with global_lock:
         is_performing_action = True
         action_start_time = last_activity_time
@@ -261,6 +273,8 @@ def move_mouse_naturally(target_x, target_y):
         with global_lock:
             if last_activity_time > action_start_time:
                 # Пользователь проявил активность - прерываем движение
+                # Добавляем запись в историю, чтобы сбросить счетчик последовательных safe_key
+                action_history.append(('mouse_move', time.time()))
                 is_performing_action = False
                 is_simulating = False
                 log(f"⚠️ Движение мыши прервано активностью пользователя (шаг {step}/{steps})", 'INFO')
@@ -323,7 +337,7 @@ def random_mouse_move():
 
 def random_arrow_press():
     """Нажатие клавиш-стрелок (имитация прокрутки/навигации)"""
-    global is_performing_action, is_simulating, last_activity_time
+    global is_performing_action, is_simulating, last_activity_time, action_history
 
     if CONFIG['natural_behavior']:
         # Больший вес для up/down (вертикальная прокрутка популярнее)
@@ -346,6 +360,8 @@ def random_arrow_press():
             if last_activity_time > action_start_time:
                 # Пользователь проявил активность - прерываем серию
                 log(f"⚠️ Серия нажатий прервана активностью пользователя (выполнено {i}/{repetitions})", 'INFO')
+                # Добавляем запись в историю, чтобы сбросить счетчик последовательных safe_key
+                action_history.append(('keyboard', time.time()))
                 is_performing_action = False
                 is_simulating = False
                 return
@@ -388,7 +404,7 @@ def safe_key_press():
 
 def control_tab_press():
     """Нажатие Ctrl+Tab (переключение вкладок)"""
-    global is_performing_action, is_simulating, last_activity_time
+    global is_performing_action, is_simulating, last_activity_time, action_history
     log(f"Нажатие комбинации клавиш")
 
     with global_lock:
@@ -403,6 +419,8 @@ def control_tab_press():
         if last_activity_time > action_start_time:
             # Пользователь проявил активность - отменяем действие
             keyboard_controller.release(Key.ctrl_l)
+            # Добавляем запись в историю, чтобы сбросить счетчик последовательных safe_key
+            action_history.append(('ctrl_tab', time.time()))
             is_performing_action = False
             is_simulating = False
             log(f"⚠️ Комбинация клавиш прервана активностью пользователя", 'INFO')
@@ -552,7 +570,25 @@ def simulate_activity():
 
                 while time.time() < burst_end_time:
                     # Выполняем легкую активность
-                    action = random.choice(['mouse_move', 'safe_key'])
+                    # Избегаем 5 подряд нажатий Shift
+                    consecutive_safe_keys = get_consecutive_safe_key_count()
+                    available_actions = []
+
+                    # Проверяем, доступно ли движение мыши
+                    if CONFIG['use_mouse_move']:
+                        available_actions.append('mouse_move')
+
+                    # Всегда добавляем safe_key, но ограничим если уже 4 подряд
+                    if consecutive_safe_keys < 4:
+                        available_actions.append('safe_key')
+
+                    # Если доступных действий нет (use_mouse_move=false и consecutive_safe_keys>=4)
+                    # то все равно добавляем safe_key, чтобы программа не зависла
+                    if not available_actions:
+                        available_actions.append('safe_key')
+                        log(f"⚠️ Внерабочий режим: вынужденно используем safe_key (уже {consecutive_safe_keys} подряд)", 'DEBUG')
+
+                    action = random.choice(available_actions)
 
                     try:
                         if action == 'mouse_move':
@@ -627,7 +663,25 @@ def simulate_activity():
                         break
 
                     # Выполняем легкую активность
-                    action = random.choice(['mouse_move', 'safe_key'])
+                    # Избегаем 5 подряд нажатий Shift
+                    consecutive_safe_keys = get_consecutive_safe_key_count()
+                    available_actions = []
+
+                    # Проверяем, доступно ли движение мыши
+                    if CONFIG['use_mouse_move']:
+                        available_actions.append('mouse_move')
+
+                    # Всегда добавляем safe_key, но ограничим если уже 4 подряд
+                    if consecutive_safe_keys < 4:
+                        available_actions.append('safe_key')
+
+                    # Если доступных действий нет (use_mouse_move=false и consecutive_safe_keys>=4)
+                    # то все равно добавляем safe_key, чтобы программа не зависла
+                    if not available_actions:
+                        available_actions.append('safe_key')
+                        log(f"⚠️ Режим перерыва: вынужденно используем safe_key (уже {consecutive_safe_keys} подряд)", 'DEBUG')
+
+                    action = random.choice(available_actions)
 
                     try:
                         if action == 'mouse_move':
@@ -716,6 +770,19 @@ def simulate_activity():
 
             if not available_actions:
                 available_actions = ['safe_key']
+
+            # Проверка: избегаем 5 подряд нажатий Shift
+            consecutive_safe_keys = get_consecutive_safe_key_count()
+            if consecutive_safe_keys >= 4 and 'safe_key' in available_actions:
+                # Удаляем все 'safe_key' из списка доступных действий
+                available_actions = [a for a in available_actions if a != 'safe_key']
+                log(f"⚠️ Избегаем 5-го подряд нажатия Shift (уже {consecutive_safe_keys} подряд)", 'DEBUG')
+
+            # Если после удаления safe_key список пуст, добавляем обратно одно действие
+            # (лучше безопасная клавиша, чем ничего)
+            if not available_actions:
+                available_actions = ['safe_key']
+                log(f"⚠️ Нет других доступных действий, оставляем safe_key", 'DEBUG')
 
             # Выбор и выполнение действия
             action = random.choice(available_actions)
