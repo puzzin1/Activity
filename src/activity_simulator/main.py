@@ -21,6 +21,8 @@ def main():
     """Основная функция запуска программы"""
     # Загружаем конфигурацию
     simulation.CONFIG, simulation.SCHEDULE = config.load_or_create_config()
+    # Ротация лог-файлов
+    simulation.setup_log_rotation()
 
     # Запуск слушателей
     keyboard_listener = keyboard.Listener(on_press=listeners.on_keyboard_event)

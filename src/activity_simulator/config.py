@@ -289,6 +289,20 @@ DEFAULT_CONFIG = {
     'afterhours_burst_interval_max': 9,
     # Максимальный интервал между всплесками активности (в минутах).
     # Программа случайно выберет интервал в этом диапазоне.
+
+    # ========================================================================
+    # РОТАЦИЯ ФАЙЛОВ
+    # ========================================================================
+
+    'max_log_files': 5,
+    # Максимальное количество сохраняемых лог-файлов.
+    # Старые файлы будут автоматически удаляться при превышении лимита.
+    # 0 = без ограничений (ротация отключена)
+
+    'max_config_files': 5,
+    # Максимальное количество сохраняемых файлов конфигурации.
+    # Старые файлы будут автоматически удаляться при превышении лимита.
+    # 0 = без ограничений (ротация отключена)
 }
 
 
@@ -368,6 +382,64 @@ def create_default_yaml():
     except Exception as e:
         print(f"⚠️  Ошибка создания YAML файла: {e}")
         return False
+
+
+def rotate_files(directory, pattern, max_files, description, exclude_file=None):
+    """
+    Удаляет старые файлы, оставляя только max_files самых новых.
+
+    Args:
+        directory (str): Директория для поиска файлов
+        pattern (str): Шаблон имени файла (например, "activity_log_*.txt")
+        max_files (int): Максимальное количество файлов для сохранения (0 = без ограничений)
+        description (str): Описание файлов для логирования
+        exclude_file (str, optional): Имя файла для исключения из удаления
+    """
+    if max_files <= 0:
+        return
+
+    import glob
+    import os
+
+    # Находим все файлы, соответствующие шаблону
+    files = glob.glob(os.path.join(directory, pattern))
+    if not files:
+        return
+
+    # Сортируем файлы по времени изменения (сначала старые)
+    files.sort(key=os.path.getmtime)
+
+    # Исключаем файл из списка, если он указан
+    if exclude_file:
+        exclude_path = os.path.join(directory, exclude_file)
+        if exclude_path in files:
+            files.remove(exclude_path)
+
+    # Удаляем старые файлы сверх лимита
+    files_to_delete = files[:-max_files] if len(files) > max_files else []
+    for file_path in files_to_delete:
+        try:
+            os.remove(file_path)
+            print(f"🗑️  Удален старый {description}: {os.path.basename(file_path)}")
+        except Exception as e:
+            print(f"⚠️  Ошибка удаления файла {file_path}: {e}")
+
+
+def ensure_config_keys(config):
+    """
+    Гарантирует, что все ключи из DEFAULT_CONFIG присутствуют в config.
+    Если ключ отсутствует, добавляет его со значением по умолчанию.
+
+    Args:
+        config (dict): Словарь конфигурации
+
+    Returns:
+        dict: Обновленный словарь конфигурации
+    """
+    for key, value in DEFAULT_CONFIG.items():
+        if key not in config:
+            config[key] = value
+    return config
 
 
 # ============================================================================
@@ -578,7 +650,14 @@ def load_or_create_config():
         try:
             with open(config_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                return data['config'], data['schedule']
+            config = data['config']
+            schedule = data['schedule']
+            # Гарантируем наличие всех ключей
+            config = ensure_config_keys(config)
+            # Ротация конфиг-файлов
+            rotate_files('.', 'activity_config_*.json', config.get('max_config_files', 5),
+                         'файл конфигурации', exclude_file=config_file)
+            return config, schedule
         except Exception as e:
             # Ошибка будет видна в консоли
             print(f"⚠️  Ошибка загрузки конфигурации: {e}")
@@ -600,6 +679,10 @@ def load_or_create_config():
             }, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"⚠️  Ошибка сохранения конфигурации: {e}")
+
+    # Ротация конфиг-файлов
+    rotate_files('.', 'activity_config_*.json', config.get('max_config_files', 5),
+                 'файл конфигурации', exclude_file=config_file)
 
     return config, schedule
 

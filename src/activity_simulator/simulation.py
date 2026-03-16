@@ -20,6 +20,7 @@ from datetime import datetime
 
 from . import config
 from . import utils
+from .config import rotate_files
 
 # Настройка контроллеров
 mouse_controller = Controller()
@@ -44,6 +45,14 @@ user_activity_after_work = False  # Флаг активности пользов
 
 CONFIG = {}
 SCHEDULE = {}
+
+def setup_log_rotation():
+    """Выполняет ротацию лог-файлов на основе настроек конфигурации"""
+    if CONFIG:
+        max_log_files = CONFIG.get('max_log_files', 5)
+        rotate_files('.', 'activity_log_*.txt', max_log_files,
+                     'лог-файл', exclude_file=os.path.basename(log_file_path))
+
 
 # Функция для логирования
 def log(message, level='INFO'):
