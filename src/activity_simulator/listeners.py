@@ -22,8 +22,9 @@ def on_keyboard_event(key):
 
         # Проверка активности после рабочего дня
         if simulation.CONFIG.get('exit_on_activity_after_work', True) and simulation.is_after_work() and not simulation.is_work_hours():
-            simulation.user_activity_after_work = True
-            simulation.log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
+            if not simulation.user_activity_after_work:
+                simulation.user_activity_after_work = True
+                simulation.log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
             return
 
         simulation.last_activity_time = time.time()
@@ -43,8 +44,9 @@ def on_mouse_event(x, y):
 
         # Проверка активности после рабочего дня
         if simulation.CONFIG.get('exit_on_activity_after_work', True) and simulation.is_after_work() and not simulation.is_work_hours():
-            simulation.user_activity_after_work = True
-            simulation.log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
+            if not simulation.user_activity_after_work:
+                simulation.user_activity_after_work = True
+                simulation.log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
             return
 
         # Обновляем время активности - программа не будет действовать минимум 60 секунд
@@ -72,8 +74,9 @@ def on_mouse_click(x, y, button, pressed):
 
             # Проверка активности после рабочего дня
             if simulation.CONFIG.get('exit_on_activity_after_work', True) and simulation.is_after_work() and not simulation.is_work_hours():
-                simulation.user_activity_after_work = True
-                simulation.log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
+                if not simulation.user_activity_after_work:
+                    simulation.user_activity_after_work = True
+                    simulation.log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
                 return
 
             simulation.last_activity_time = time.time()

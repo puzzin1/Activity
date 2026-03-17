@@ -144,6 +144,10 @@ def type_key_sequence(sequence):
     if not sequence:
         return
 
+    with global_lock:
+        if user_activity_after_work:
+            return
+
     log(f"🔑 Начало ввода последовательности клавиш")
 
     with global_lock:
@@ -196,15 +200,25 @@ def type_key_sequence(sequence):
 def show_shutdown_warning():
     """Показывает всплывающее окно с предупреждением о выключении"""
     global shutdown_cancelled
+    timer = None
 
     def on_cancel():
         global shutdown_cancelled
+        nonlocal timer
         shutdown_cancelled = True
         log("⚠️ Выключение отменено пользователем")
+        if timer is not None:
+            try:
+                timer.cancel()
+            except:
+                pass
         root.destroy()
 
     def on_timeout():
-        root.destroy()
+        try:
+            root.destroy()
+        except:
+            pass
 
     # Создаем окно
     root = tk.Tk()
@@ -287,6 +301,13 @@ def move_mouse_naturally(target_x, target_y):
                 is_performing_action = False
                 is_simulating = False
                 log(f"⚠️ Движение мыши прервано активностью пользователя (шаг {step}/{steps})", 'INFO')
+                return
+            # Проверка активности пользователя после работы
+            if user_activity_after_work:
+                action_history.append(('mouse_move', time.time()))
+                is_performing_action = False
+                is_simulating = False
+                log(f"🚪 Движение мыши прервано активностью пользователя после рабочего дня (шаг {step}/{steps})", 'INFO')
                 return
 
         t = step / steps
@@ -374,6 +395,12 @@ def random_arrow_press():
                 is_performing_action = False
                 is_simulating = False
                 return
+            # Проверка активности пользователя после работы
+            if user_activity_after_work:
+                log(f"🚪 Серия нажатий прервана активностью пользователя после рабочего дня (выполнено {i}/{repetitions})", 'INFO')
+                is_performing_action = False
+                is_simulating = False
+                return
 
         keyboard_controller.press(arrow)
         time.sleep(random.uniform(0.05, 0.15))
@@ -388,6 +415,9 @@ def random_arrow_press():
 def random_mouse_click():
     """Клик левой кнопкой мыши в текущей позиции"""
     global is_performing_action
+    with global_lock:
+        if user_activity_after_work:
+            return
     log(f"Клик левой кнопкой мыши в текущей позиции")
 
     with global_lock: is_performing_action = True
@@ -400,6 +430,9 @@ def random_mouse_click():
 def safe_key_press():
     """Нажатие безопасной клавиши (Shift) - не производит побочных эффектов"""
     global is_performing_action
+    with global_lock:
+        if user_activity_after_work:
+            return
     log(f"Нажатие безопасной клавиши")
 
     with global_lock: is_performing_action = True
@@ -434,6 +467,14 @@ def control_tab_press():
             is_simulating = False
             log(f"⚠️ Комбинация клавиш прервана активностью пользователя", 'INFO')
             return
+        # Проверка активности пользователя после работы
+        if user_activity_after_work:
+            keyboard_controller.release(Key.ctrl_l)
+            action_history.append(('ctrl_tab', time.time()))
+            is_performing_action = False
+            is_simulating = False
+            log(f"🚪 Комбинация клавиш прервана активностью пользователя после рабочего дня", 'INFO')
+            return
 
     keyboard_controller.press(Key.tab)
     time.sleep(random.uniform(0.1, 0.2))
@@ -456,17 +497,18 @@ def simulate_activity():
 
     while True:
         # Проверка активности пользователя после работы
-        if user_activity_after_work:
-            log("🚪 Завершение программы из-за активности пользователя после рабочего дня")
-            print("\n" + "=" * 70)
-            print("🚪 ОБНАРУЖЕНА АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ")
-            print("=" * 70)
-            print("Программа завершена без блокировки/выключения компьютера")
-            if CONFIG['verbose_logging']:
-                print(f"📄 Лог сохранён в файл: {log_file_path}")
-            print("=" * 70)
-            time.sleep(1)
-            os._exit(0)
+        with global_lock:
+            if user_activity_after_work:
+                log("🚪 Завершение программы из-за активности пользователя после рабочего дня")
+                print("\n" + "=" * 70)
+                print("🚪 ОБНАРУЖЕНА АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ")
+                print("=" * 70)
+                print("Программа завершена без блокировки/выключения компьютера")
+                if CONFIG['verbose_logging']:
+                    print(f"📄 Лог сохранён в файл: {log_file_path}")
+                print("=" * 70)
+                time.sleep(1)
+                os._exit(0)
 
         # Проверяем режим работы
         in_work_hours = is_work_hours()
@@ -496,6 +538,19 @@ def simulate_activity():
         if not in_work_hours:
             # Проверяем, нужна ли активность вне рабочего времени
             if not should_simulate_afterhours():
+                # Проверка активности пользователя после работы
+                with global_lock:
+                    if user_activity_after_work:
+                        log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
+                        print("\n" + "=" * 70)
+                        print("🚪 ОБНАРУЖЕНА АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ")
+                        print("=" * 70)
+                        print("Программа завершена без блокировки/выключения компьютера")
+                        if CONFIG['verbose_logging']:
+                            print(f"📄 Лог сохранён в файл: {log_file_path}")
+                        print("=" * 70)
+                        time.sleep(1)
+                        os._exit(0)
                 # Если мы ПОСЛЕ работы и активность отключена - завершаем программу
                 if is_after_work():
                     log(f"🏁 Рабочий день завершен. Программа останавливается (режим: {CONFIG['afterhours_mode']})")
@@ -513,6 +568,8 @@ def simulate_activity():
                         # Продолжаем работу в режиме ожидания
                         time.sleep(60)
                         shutdown_cancelled = False
+                        with global_lock:
+                            user_activity_after_work = False
                         continue
 
                     print("\n" + "=" * 70)
@@ -577,7 +634,16 @@ def simulate_activity():
                     initial_mouse_position = mouse_controller.position
                     is_simulating = True
 
+                burst_interrupted = False
                 while time.time() < burst_end_time:
+                    # Проверка активности пользователя после работы
+                    with global_lock:
+                        if user_activity_after_work:
+                            log("🚪 Внерабочий режим: прерывание всплеска из-за активности пользователя после рабочего дня")
+                            burst_interrupted = True
+                            with global_lock:
+                                is_simulating = False
+                            break
                     # Выполняем легкую активность
                     # Избегаем 5 подряд нажатий Shift
                     consecutive_safe_keys = get_consecutive_safe_key_count()
@@ -614,6 +680,9 @@ def simulate_activity():
 
                 with global_lock:
                     is_simulating = False
+
+                if burst_interrupted:
+                    continue
 
                 last_burst_time = time.time()
                 log(f"{time_indicator} Всплеск активности завершен. Следующий через {burst_interval/60:.1f} мин")
@@ -662,6 +731,7 @@ def simulate_activity():
 
                 burst_completed = False
                 break_ended = False
+                burst_interrupted = False
 
                 while time.time() < burst_end_time:
                     # Проверяем, не закончился ли перерыв
@@ -670,6 +740,13 @@ def simulate_activity():
                         log(f"☕ Перерыв завершился. Выход из режима перерыва.")
                         break_ended = True
                         break
+
+                    # Проверка активности пользователя после работы
+                    with global_lock:
+                        if user_activity_after_work:
+                            log("🚪 Режим перерыва: прерывание всплеска из-за активности пользователя после рабочего дня")
+                            burst_interrupted = True
+                            break
 
                     # Выполняем легкую активность
                     # Избегаем 5 подряд нажатий Shift
@@ -710,6 +787,9 @@ def simulate_activity():
 
                 with global_lock:
                     is_simulating = False
+
+                if burst_interrupted:
+                    continue
 
                 if break_ended:
                     # Перерыв закончился досрочно, не обновляем время последнего всплеска
