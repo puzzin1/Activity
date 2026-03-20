@@ -11,20 +11,31 @@ from pynput.keyboard import Key
 from . import simulation
 
 
+# === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+
+def _check_and_update_activity_after_work():
+    """
+    Проверяет активность после рабочего дня и обновляет флаг.
+    Возвращает True, если нужно прервать обработку (послерабочее время).
+    """
+    if simulation.CONFIG.get('exit_on_activity_after_work', True) and simulation.is_after_work() and not simulation.is_work_hours():
+        if not simulation.user_activity_after_work:
+            simulation.user_activity_after_work = True
+            simulation.log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
+        return True
+    return False
+
+
 # === ФУНКЦИИ-СЛУШАТЕЛИ ===
 
 def on_keyboard_event(key):
-    """Обработчик нажатий клавиш клавиатуры"""
+    """Обработчик нажатий клавиатуры"""
     with simulation.global_lock:
         if simulation.is_performing_action:
             simulation.log(f"Игнорирование симулированного события клавиатуры", 'DEBUG')
             return
 
-        # Проверка активности после рабочего дня
-        if simulation.CONFIG.get('exit_on_activity_after_work', True) and simulation.is_after_work() and not simulation.is_work_hours():
-            if not simulation.user_activity_after_work:
-                simulation.user_activity_after_work = True
-                simulation.log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
+        if _check_and_update_activity_after_work():
             return
 
         simulation.last_activity_time = time.time()
@@ -32,6 +43,7 @@ def on_keyboard_event(key):
         simulation.is_simulating = False
         simulation.absolute_anchor_position = None
         simulation.log(f"Обнаружена активность клавиатуры", 'DEBUG')
+
 
 def on_mouse_event(x, y):
     """
@@ -42,11 +54,7 @@ def on_mouse_event(x, y):
         if simulation.is_performing_action:
             return
 
-        # Проверка активности после рабочего дня
-        if simulation.CONFIG.get('exit_on_activity_after_work', True) and simulation.is_after_work() and not simulation.is_work_hours():
-            if not simulation.user_activity_after_work:
-                simulation.user_activity_after_work = True
-                simulation.log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
+        if _check_and_update_activity_after_work():
             return
 
         # Обновляем время активности - программа не будет действовать минимум 60 секунд
@@ -61,6 +69,7 @@ def on_mouse_event(x, y):
             simulation.log(f"Обнаружено движение мыши пользователем", 'DEBUG')
             simulation.last_mouse_log_time = current_time
 
+
 def on_mouse_click(x, y, button, pressed):
     """
     Обработчик кликов мыши/тачпада.
@@ -72,11 +81,7 @@ def on_mouse_click(x, y, button, pressed):
                 simulation.log(f"Игнорирование симулированного клика мыши", 'DEBUG')
                 return
 
-            # Проверка активности после рабочего дня
-            if simulation.CONFIG.get('exit_on_activity_after_work', True) and simulation.is_after_work() and not simulation.is_work_hours():
-                if not simulation.user_activity_after_work:
-                    simulation.user_activity_after_work = True
-                    simulation.log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
+            if _check_and_update_activity_after_work():
                 return
 
             simulation.last_activity_time = time.time()

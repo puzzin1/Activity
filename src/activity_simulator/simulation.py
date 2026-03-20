@@ -23,6 +23,18 @@ from . import utils
 from .config import rotate_files
 
 
+# === ИМЕНОВАННЫЕ КОНСТАНТЫ ===
+
+# Минимальная задержка в секундах после активности пользователя
+MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60
+
+# Максимальное количество подряд идущих safe_key действий
+MAX_CONSECUTIVE_SAFE_KEYS = 4
+
+# Порог очистки истории действий
+ACTION_HISTORY_CLEAR_THRESHOLD = 100
+
+
 # === КЛАССЫ ИСКЛЮЧЕНИЙ ===
 
 class ExitSimulation(Exception):
@@ -87,7 +99,7 @@ def log(message, level='INFO'):
         try:
             with open(log_file_path, 'a', encoding='utf-8') as f:
                 f.write(log_message + '\n')
-        except Exception as e:
+        except (OSError, IOError, PermissionError) as e:
             print(f"Ошибка записи в лог-файл: {e}")
 
 # === ФУНКЦИИ ПРОВЕРКИ ВРЕМЕНИ ===
@@ -537,8 +549,7 @@ def _execute_burst_activity(last_burst_time_ref, burst_interval_min, burst_inter
         burst_interval_max * 60
     )
 
-    # Проверяем, прошло ли минимум 60 секунд с последней активности пользователя
-    MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60
+    # Проверяем, прошло ли минимум MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд с последней активности пользователя
     with global_lock:
         time_since_user_activity = time.time() - last_activity_time
 
@@ -584,7 +595,7 @@ def _execute_burst_activity(last_burst_time_ref, burst_interval_min, burst_inter
                 available_actions.append('mouse_move')
 
             # Всегда добавляем safe_key, но ограничим если уже 4 подряд
-            if consecutive_safe_keys < 4:
+            if consecutive_safe_keys < MAX_CONSECUTIVE_SAFE_KEYS:
                 available_actions.append('safe_key')
 
             # Если доступных действий нет - все равно добавляем safe_key
@@ -760,8 +771,7 @@ def simulate_activity():
                 CONFIG['afterhours_burst_interval_max'] * 60
             )
 
-            # Проверяем, прошло ли минимум 60 секунд с последней активности пользователя
-            MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60
+            # Проверяем, прошло ли минимум MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд с последней активности пользователя
             with global_lock:
                 time_since_user_activity = time.time() - last_activity_time
 
@@ -801,7 +811,7 @@ def simulate_activity():
                         available_actions.append('mouse_move')
 
                     # Всегда добавляем safe_key, но ограничим если уже 4 подряд
-                    if consecutive_safe_keys < 4:
+                    if consecutive_safe_keys < MAX_CONSECUTIVE_SAFE_KEYS:
                         available_actions.append('safe_key')
 
                     # Если доступных действий нет (use_mouse_move=false и consecutive_safe_keys>=4)
@@ -856,8 +866,7 @@ def simulate_activity():
                 CONFIG['afterhours_burst_interval_max'] * 60
             )
 
-            # Проверяем, прошло ли минимум 60 секунд с последней активности пользователя
-            MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60
+            # Проверяем, прошло ли минимум MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд с последней активности пользователя
             with global_lock:
                 time_since_user_activity = time.time() - last_activity_time
 
@@ -905,7 +914,7 @@ def simulate_activity():
                         available_actions.append('mouse_move')
 
                     # Всегда добавляем safe_key, но ограничим если уже 4 подряд
-                    if consecutive_safe_keys < 4:
+                    if consecutive_safe_keys < MAX_CONSECUTIVE_SAFE_KEYS:
                         available_actions.append('safe_key')
 
                     # Если доступных действий нет (use_mouse_move=false и consecutive_safe_keys>=4)
@@ -969,9 +978,7 @@ def simulate_activity():
                 current_idle_threshold_local = current_idle_threshold
             log(f"Установлен новый порог бездействия: {current_idle_threshold_local} сек", 'DEBUG')
 
-        # КРИТИЧЕСКИ ВАЖНО: Минимальная задержка 60 секунд после любой активности пользователя
-        MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60
-
+        # КРИТИЧЕСКИ ВАЖНО: Минимальная задержка MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд после любой активности пользователя
         # Проверка необходимости симуляции
         # Программа начинает действовать только если:
         # 1. Прошло минимум 60 секунд с последней активности пользователя
@@ -1009,7 +1016,7 @@ def simulate_activity():
 
             # Проверка: избегаем 5 подряд нажатий Shift
             consecutive_safe_keys = get_consecutive_safe_key_count()
-            if consecutive_safe_keys >= 4 and 'safe_key' in available_actions:
+            if consecutive_safe_keys >= MAX_CONSECUTIVE_SAFE_KEYS and 'safe_key' in available_actions:
                 # Удаляем все 'safe_key' из списка доступных действий
                 available_actions = [a for a in available_actions if a != 'safe_key']
                 log(f"⚠️ Избегаем 5-го подряд нажатия Shift (уже {consecutive_safe_keys} подряд)", 'DEBUG')
@@ -1063,8 +1070,7 @@ def simulate_activity():
                     if not is_simulating:
                         log("Симуляция прервана активностью пользователя.", 'INFO')
 
-            # Показываем оставшееся время с учетом минимальной задержки 60 сек
-            MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60
+            # Показываем оставшееся время с учетом минимальной задержки
             if time_since_last_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
                 remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_last_activity
                 log(f"Ожидание после активности пользователя. Осталось: {remaining:.1f} сек", 'DEBUG')
@@ -1084,5 +1090,5 @@ def show_stats():
         if len(action_history) > 0:
             recent = [a for a in action_history if time.time() - a[1] < 3600]
             log(f"[Статистика] Действий за последний час: {len(recent)}")
-            if len(action_history) > 100:
+            if len(action_history) > ACTION_HISTORY_CLEAR_THRESHOLD:
                 action_history.clear()

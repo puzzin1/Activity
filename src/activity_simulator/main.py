@@ -7,6 +7,7 @@ import time
 import os
 import sys
 import signal
+import atexit
 from threading import Thread
 from pynput import mouse, keyboard
 from datetime import datetime
@@ -17,20 +18,49 @@ from . import listeners
 from . import utils
 
 
+# Глобальные ссылки на слушатели для корректной очистки
+_keyboard_listener = None
+_mouse_listener = None
+
+
+def _cleanup_listeners():
+    """Останавливает слушатели pynput при завершении программы"""
+    global _keyboard_listener, _mouse_listener
+
+    if _keyboard_listener is not None:
+        try:
+            _keyboard_listener.stop()
+            _keyboard_listener.join(timeout=2.0)
+        except Exception:
+            pass
+
+    if _mouse_listener is not None:
+        try:
+            _mouse_listener.stop()
+            _mouse_listener.join(timeout=2.0)
+        except Exception:
+            pass
+
+
 def main():
     """Основная функция запуска программы"""
+    global _keyboard_listener, _mouse_listener
+
+    # Регистрируем обработчик очистки
+    atexit.register(_cleanup_listeners)
+
     # Загружаем конфигурацию
     simulation.CONFIG, simulation.SCHEDULE = config.load_or_create_config()
     # Ротация лог-файлов
     simulation.setup_log_rotation()
 
     # Запуск слушателей
-    keyboard_listener = keyboard.Listener(on_press=listeners.on_keyboard_event)
-    mouse_listener = mouse.Listener(on_move=listeners.on_mouse_event,
-                                    on_click=listeners.on_mouse_click)
+    _keyboard_listener = keyboard.Listener(on_press=listeners.on_keyboard_event)
+    _mouse_listener = mouse.Listener(on_move=listeners.on_mouse_event,
+                                     on_click=listeners.on_mouse_click)
 
-    keyboard_listener.start()
-    mouse_listener.start()
+    _keyboard_listener.start()
+    _mouse_listener.start()
 
     simulation.initial_mouse_position = simulation.mouse_controller.position
 

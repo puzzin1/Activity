@@ -358,7 +358,7 @@ def load_yaml_config():
         print(f"✅ Конфигурация загружена из {YAML_CONFIG_PATH}")
         return config
 
-    except Exception as e:
+    except (yaml.YAMLError, FileNotFoundError, PermissionError) as e:
         print(f"⚠️  Ошибка загрузки YAML конфигурации: {e}")
         print("   Используем настройки по умолчанию")
         return DEFAULT_CONFIG.copy()
@@ -379,7 +379,7 @@ def create_default_yaml():
         print(f"✅ Файл конфигурации создан: {YAML_CONFIG_PATH}")
         print("   Отредактируйте его для настройки программы.")
         return True
-    except Exception as e:
+    except (PermissionError, OSError, IOError) as e:
         print(f"⚠️  Ошибка создания YAML файла: {e}")
         return False
 
@@ -421,7 +421,7 @@ def rotate_files(directory, pattern, max_files, description, exclude_file=None):
         try:
             os.remove(file_path)
             print(f"🗑️  Удален старый {description}: {os.path.basename(file_path)}")
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, OSError) as e:
             print(f"⚠️  Ошибка удаления файла {file_path}: {e}")
 
 
@@ -658,7 +658,7 @@ def load_or_create_config():
             rotate_files('.', 'activity_config_*.json', config.get('max_config_files', 5),
                          'файл конфигурации', exclude_file=config_file)
             return config, schedule
-        except Exception as e:
+        except (json.JSONDecodeError, FileNotFoundError, PermissionError, KeyError) as e:
             # Ошибка будет видна в консоли
             print(f"⚠️  Ошибка загрузки конфигурации: {e}")
             print(f"   Создание новой конфигурации...")
@@ -677,7 +677,7 @@ def load_or_create_config():
                 'note': 'Этот файл содержит настройки и расписание на день. ' +
                        'Редактируйте config для изменения параметров работы программы.'
             }, f, ensure_ascii=False, indent=2)
-    except Exception as e:
+    except (PermissionError, OSError, IOError) as e:
         print(f"⚠️  Ошибка сохранения конфигурации: {e}")
 
     # Ротация конфиг-файлов
