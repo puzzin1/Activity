@@ -258,16 +258,25 @@ def main():
     try:
         while running:
             time.sleep(0.5)
+            # Проверяем, завершилась ли симуляция (через ExitSimulation)
+            if simulation.simulation_finished:
+                running = False
     except KeyboardInterrupt:
         pass
 
-    # Обработка завершения
-    print("\n\n🛑 Программа остановлена пользователем")
+    # Обработка завершения - определяем причину
+    if simulation.simulation_finished:
+        # Симуляция завершилась сама (через ExitSimulation)
+        print("\n\n🏁 Программа завершена автоматически")
+    else:
+        # Обычное завершение (Ctrl+C или пользователь)
+        print("\n\n🛑 Программа остановлена пользователем")
+
     if simulation.CONFIG['verbose_logging']:
         print(f"📄 Лог сохранён в файл: {simulation.log_file_path}")
         simulation.log("")
         simulation.log("=" * 70)
-        simulation.log(f"Программа остановлена пользователем. Всего действий: {len(simulation.action_history)}")
+        simulation.log(f"Программа завершена. Всего действий: {len(simulation.action_history)}")
         simulation.log("=" * 70)
 
     # При нажатии Ctrl-C программа просто завершается
