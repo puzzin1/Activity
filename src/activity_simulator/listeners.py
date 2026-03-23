@@ -3,17 +3,18 @@
 Содержит функции-слушатели для отслеживания активности пользователя.
 """
 
+from typing import Union
 import time
 from pynput import mouse, keyboard
 from pynput.mouse import Button
-from pynput.keyboard import Key
+from pynput.keyboard import Key, KeyCode
 
 from . import simulation
 
 
 # === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
-def _check_and_update_activity_after_work():
+def _check_and_update_activity_after_work() -> bool:
     """
     Проверяет активность после рабочего дня и обновляет флаг.
     Возвращает True, если нужно прервать обработку (послерабочее время).
@@ -28,7 +29,7 @@ def _check_and_update_activity_after_work():
 
 # === ФУНКЦИИ-СЛУШАТЕЛИ ===
 
-def on_keyboard_event(key):
+def on_keyboard_event(key: Union[Key, KeyCode]) -> None:
     """Обработчик нажатий клавиатуры"""
     with simulation.global_lock:
         if simulation.is_performing_action:
@@ -45,7 +46,7 @@ def on_keyboard_event(key):
         simulation.log(f"Обнаружена активность клавиатуры", 'DEBUG')
 
 
-def on_mouse_event(x, y):
+def on_mouse_event(x: int, y: int) -> None:
     """
     Обработчик движения мыши/тачпада.
     Автоматически отслеживает как движения мыши, так и тачпада.
@@ -70,7 +71,7 @@ def on_mouse_event(x, y):
             simulation.last_mouse_log_time = current_time
 
 
-def on_mouse_click(x, y, button, pressed):
+def on_mouse_click(x: int, y: int, button: Button, pressed: bool) -> None:
     """
     Обработчик кликов мыши/тачпада.
     Автоматически отслеживает как клики мыши, так и тапы тачпада.

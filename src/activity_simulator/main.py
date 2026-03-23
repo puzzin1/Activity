@@ -3,6 +3,7 @@
 Инициализирует компоненты и запускает главный цикл.
 """
 
+from typing import Optional
 import time
 import os
 import sys
@@ -19,11 +20,11 @@ from . import utils
 
 
 # Глобальные ссылки на слушатели для корректной очистки
-_keyboard_listener = None
-_mouse_listener = None
+_keyboard_listener: Optional[keyboard.Listener] = None
+_mouse_listener: Optional[mouse.Listener] = None
 
 
-def _cleanup_listeners():
+def _cleanup_listeners() -> None:
     """Останавливает слушатели pynput при завершении программы"""
     global _keyboard_listener, _mouse_listener
 
@@ -42,17 +43,25 @@ def _cleanup_listeners():
             pass
 
 
-def main():
+def _cleanup_resources() -> None:
+    """Очищает все ресурсы при завершении программы"""
+    simulation.close_logger()
+    _cleanup_listeners()
+
+
+def main() -> None:
     """Основная функция запуска программы"""
     global _keyboard_listener, _mouse_listener
 
     # Регистрируем обработчик очистки
-    atexit.register(_cleanup_listeners)
+    atexit.register(_cleanup_resources)
 
     # Загружаем конфигурацию
     simulation.CONFIG, simulation.SCHEDULE = config.load_or_create_config()
     # Ротация лог-файлов
     simulation.setup_log_rotation()
+    # Инициализируем буферизованный логгер
+    simulation.init_logger(simulation.log_file_path, simulation.CONFIG.get('verbose_logging', True))
 
     # Запуск слушателей
     _keyboard_listener = keyboard.Listener(on_press=listeners.on_keyboard_event)
@@ -277,7 +286,7 @@ def main():
     # Флаг для корректного завершения
     running = True
 
-    def signal_handler(sig, frame):
+    def signal_handler(sig: int, frame) -> None:
         """Обработчик сигнала Ctrl+C"""
         nonlocal running
         running = False

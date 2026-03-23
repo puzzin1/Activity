@@ -3,6 +3,7 @@
 Содержит настройки по умолчанию, генерацию расписания и работу с JSON-файлами
 """
 
+from typing import Optional, Dict, List, Any, Tuple
 import json
 import random
 import os
@@ -310,7 +311,7 @@ DEFAULT_CONFIG = {
 # ФУНКЦИИ ЗАГРУЗКИ YAML КОНФИГУРАЦИИ
 # ============================================================================
 
-def load_yaml_config():
+def load_yaml_config() -> Dict[str, Any]:
     """
     Загружает конфигурацию из файла config.yaml.
 
@@ -364,7 +365,7 @@ def load_yaml_config():
         return DEFAULT_CONFIG.copy()
 
 
-def create_default_yaml():
+def create_default_yaml() -> bool:
     """
     Создает файл config.yaml с настройками по умолчанию.
     """
@@ -384,7 +385,7 @@ def create_default_yaml():
         return False
 
 
-def rotate_files(directory, pattern, max_files, description, exclude_file=None):
+def rotate_files(directory: str, pattern: str, max_files: int, description: str, exclude_file: Optional[str] = None) -> None:
     """
     Удаляет старые файлы, оставляя только max_files самых новых.
 
@@ -425,7 +426,7 @@ def rotate_files(directory, pattern, max_files, description, exclude_file=None):
             print(f"⚠️  Ошибка удаления файла {file_path}: {e}")
 
 
-def ensure_config_keys(config):
+def ensure_config_keys(config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Гарантирует, что все ключи из DEFAULT_CONFIG присутствуют в config.
     Если ключ отсутствует, добавляет его со значением по умолчанию.
@@ -446,7 +447,7 @@ def ensure_config_keys(config):
 # ФУНКЦИИ РАБОТЫ С КОНФИГУРАЦИЕЙ
 # ============================================================================
 
-def get_config_filename():
+def get_config_filename() -> str:
     """
     Генерирует имя файла конфигурации на основе текущей даты.
     Файл создается один раз в день и используется при повторных запусках.
@@ -457,7 +458,7 @@ def get_config_filename():
     return f"activity_config_{datetime.now().strftime('%Y%m%d')}.json"
 
 
-def time_str_to_minutes(time_str):
+def time_str_to_minutes(time_str: str) -> int:
     """
     Конвертирует строку времени 'HH:MM' в минуты с начала дня.
 
@@ -475,7 +476,7 @@ def time_str_to_minutes(time_str):
     return h * 60 + m
 
 
-def minutes_to_time_str(minutes):
+def minutes_to_time_str(minutes: int) -> str:
     """
     Конвертирует минуты с начала дня в строку 'HH:MM'.
 
@@ -494,7 +495,7 @@ def minutes_to_time_str(minutes):
     return f"{h:02d}:{m:02d}"
 
 
-def generate_schedule(config):
+def generate_schedule(config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Генерирует расписание работы и перерывов на день на основе конфигурации.
 
@@ -629,7 +630,7 @@ def generate_schedule(config):
     return schedule
 
 
-def load_or_create_config():
+def load_or_create_config() -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
     Загружает конфигурацию из существующего файла или создает новую.
 

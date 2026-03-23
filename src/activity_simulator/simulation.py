@@ -3,6 +3,7 @@
 Содержит логику симуляции, функции выполнения действий и главный цикл.
 """
 
+from typing import Optional, List, Tuple, Union, TextIO, Any
 import time
 import random
 import os
@@ -12,6 +13,7 @@ import platform
 import subprocess
 import tkinter as tk
 from tkinter import messagebox
+from collections import deque
 from threading import Thread, Lock, Timer
 from pynput import mouse, keyboard
 from pynput.mouse import Controller, Button
@@ -26,13 +28,13 @@ from .config import rotate_files
 # === ИМЕНОВАННЫЕ КОНСТАНТЫ ===
 
 # Минимальная задержка в секундах после активности пользователя
-MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60
+MINIMUM_DELAY_AFTER_USER_ACTIVITY: int = 60
 
 # Максимальное количество подряд идущих safe_key действий
-MAX_CONSECUTIVE_SAFE_KEYS = 4
+MAX_CONSECUTIVE_SAFE_KEYS: int = 4
 
 # Порог очистки истории действий
-ACTION_HISTORY_CLEAR_THRESHOLD = 100
+ACTION_HISTORY_CLEAR_THRESHOLD: int = 100
 
 
 # === КЛАССЫ ИСКЛЮЧЕНИЙ ===
@@ -52,32 +54,32 @@ class ExitSimulation(Exception):
 
 
 # Настройка контроллеров
-mouse_controller = Controller()
-keyboard_controller = KeyboardController()
+mouse_controller: Controller = Controller()
+keyboard_controller: KeyboardController = KeyboardController()
 
 # --- МЕХАНИЗМ СИНХРОНИЗАЦИИ ---
-global_lock = Lock()
+global_lock: Lock = Lock()
 
 # Переменные для отслеживания
-last_activity_time = time.time()
-initial_mouse_position = None
-absolute_anchor_position = None
-is_simulating = False
-is_performing_action = False
-action_history = []
-log_file_path = f"activity_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-current_idle_threshold = None
-last_mouse_log_time = 0
-lunch_sequence_executed = False  # Флаг для отслеживания ввода после обеда
-shutdown_cancelled = False  # Флаг отмены выключения
-user_activity_after_work = False  # Флаг активности пользователя после работы
-last_break_burst_time = None  # Время последнего всплеска во время перерыва
-simulation_finished = False  # Флаг завершения симуляции
+last_activity_time: float = time.time()
+initial_mouse_position: Optional[Tuple[int, int]] = None
+absolute_anchor_position: Optional[Tuple[int, int]] = None
+is_simulating: bool = False
+is_performing_action: bool = False
+action_history: deque[Tuple[str, float]] = deque(maxlen=ACTION_HISTORY_CLEAR_THRESHOLD)
+log_file_path: str = f"activity_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+current_idle_threshold: Optional[int] = None
+last_mouse_log_time: float = 0.0
+lunch_sequence_executed: bool = False  # Флаг для отслеживания ввода после обеда
+shutdown_cancelled: bool = False  # Флаг отмены выключения
+user_activity_after_work: bool = False  # Флаг активности пользователя после работы
+last_break_burst_time: Optional[float] = None  # Время последнего всплеска во время перерыва
+simulation_finished: bool = False  # Флаг завершения симуляции
 
-CONFIG = {}
-SCHEDULE = {}
+CONFIG: dict = {}
+SCHEDULE: dict = {}
 
-def setup_log_rotation():
+def setup_log_rotation() -> None:
     """Выполняет ротацию лог-файлов на основе настроек конфигурации"""
     if CONFIG:
         max_log_files = CONFIG.get('max_log_files', 5)
@@ -85,45 +87,180 @@ def setup_log_rotation():
                      'лог-файл', exclude_file=os.path.basename(log_file_path))
 
 
-# Функция для логирования
-def log(message, level='INFO'):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    log_message = f"[{timestamp}] [{level}] {message}"
+# === КЛАСС БУФЕРИЗОВАННОГО ЛОГГАРА ===
 
-    # Выводим в консоль только ERROR и WARNING
-    if level in ['ERROR', 'WARNING']:
-        print(log_message)
+class BufferedLogger:
+    """
+    Буферизованный логгер для снижения количества операций ввода-вывода.
 
-    # Записываем в файл если включено подробное логирование
-    if CONFIG.get('verbose_logging', True):
+    Накапливает сообщения в памяти и записывает их в файл периодически
+    или при достижении определенного количества сообщений.
+    """
+
+    # Параметры буферизации
+    FLUSH_INTERVAL: float = 5.0  # Интервал flush в секундах
+    BUFFER_SIZE: int = 100  # Максимальный размер буфера сообщений
+
+    file_path: str
+    enabled: bool
+    _buffer: List[str]
+    _last_flush_time: float
+    _lock: Lock
+    _file_handle: Optional[TextIO]
+
+    def __init__(self, file_path: str, enabled: bool = True) -> None:
+        """
+        Инициализирует буферизованный логгер.
+
+        Args:
+            file_path: Путь к файлу лога
+            enabled: Включен ли логгер
+        """
+        self.file_path = file_path
+        self.enabled = enabled
+        self._buffer = []
+        self._last_flush_time = time.time()
+        self._lock = Lock()
+        self._file_handle = None
+
+        # Открываем файл в режиме добавления
+        if self.enabled:
+            try:
+                self._file_handle = open(file_path, 'a', encoding='utf-8')
+            except (OSError, IOError, PermissionError) as e:
+                print(f"Ошибка открытия лог-файла: {e}")
+                self.enabled = False
+
+    def log(self, message: str, level: str = 'INFO') -> None:
+        """
+        Добавляет сообщение в буфер лога.
+
+        Args:
+            message: Сообщение для логирования
+            level: Уровень логирования (INFO, WARNING, ERROR, DEBUG)
+        """
+        if not self.enabled:
+            return
+
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        log_message = f"[{timestamp}] [{level}] {message}"
+
+        # Выводим в консоль только ERROR и WARNING
+        if level in ['ERROR', 'WARNING']:
+            print(log_message)
+
+        with self._lock:
+            self._buffer.append(log_message)
+
+            # Важные сообщения выводим немедленно
+            if level in ['ERROR', 'WARNING']:
+                self._flush_buffer()
+            # Или при достижении размера буфера
+            elif len(self._buffer) >= self.BUFFER_SIZE:
+                self._flush_buffer()
+            # Или по интервалу времени
+            elif time.time() - self._last_flush_time >= self.FLUSH_INTERVAL:
+                self._flush_buffer()
+
+    def _flush_buffer(self) -> None:
+        """Записывает все сообщения из буфера в файл."""
+        if not self._buffer or not self._file_handle:
+            return
+
         try:
-            with open(log_file_path, 'a', encoding='utf-8') as f:
-                f.write(log_message + '\n')
+            for msg in self._buffer:
+                self._file_handle.write(msg + '\n')
+            self._file_handle.flush()
         except (OSError, IOError, PermissionError) as e:
             print(f"Ошибка записи в лог-файл: {e}")
 
+        self._buffer.clear()
+        self._last_flush_time = time.time()
+
+    def close(self) -> None:
+        """Закрывает логгер, записывая все оставшиеся сообщения."""
+        with self._lock:
+            if self._file_handle:
+                try:
+                    self._flush_buffer()
+                    self._file_handle.close()
+                except Exception as e:
+                    print(f"Ошибка закрытия лог-файла: {e}")
+                finally:
+                    self._file_handle = None
+
+
+# Глобальный экземпляр логгера (инициализируется в main.py)
+_logger: BufferedLogger = None
+
+
+def log(message: str, level: str = 'INFO') -> None:
+    """
+    Функция для логирования через буферизованный логгер.
+
+    Args:
+        message: Сообщение для логирования
+        level: Уровень логирования (INFO, WARNING, ERROR, DEBUG)
+    """
+    if _logger:
+        _logger.log(message, level)
+    else:
+        # Fallback: прямой вывод если логгер не инициализирован
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        log_message = f"[{timestamp}] [{level}] {message}"
+
+        if level in ['ERROR', 'WARNING']:
+            print(log_message)
+
+        if CONFIG.get('verbose_logging', True):
+            try:
+                with open(log_file_path, 'a', encoding='utf-8') as f:
+                    f.write(log_message + '\n')
+            except (OSError, IOError, PermissionError) as e:
+                print(f"Ошибка записи в лог-файл: {e}")
+
+
+def init_logger(file_path: str, enabled: bool = True) -> None:
+    """
+    Инициализирует глобальный логгер.
+
+    Args:
+        file_path: Путь к файлу лога
+        enabled: Включен ли логгер
+    """
+    global _logger
+    _logger = BufferedLogger(file_path, enabled)
+
+
+def close_logger() -> None:
+    """Закрывает глобальный логгер."""
+    global _logger
+    if _logger:
+        _logger.close()
+        _logger = None
+
 # === ФУНКЦИИ ПРОВЕРКИ ВРЕМЕНИ ===
 
-def is_work_hours():
+def is_work_hours() -> bool:
     """Проверяет, находимся ли мы в рабочее время"""
     current = utils.get_current_time_minutes()
     work_start = utils.time_str_to_minutes(SCHEDULE['work_start'])
     work_end = utils.time_str_to_minutes(SCHEDULE['work_end'])
     return work_start <= current <= work_end
 
-def is_before_work():
+def is_before_work() -> bool:
     """Проверяет, находимся ли мы ДО начала рабочего времени"""
     current = utils.get_current_time_minutes()
     work_start = utils.time_str_to_minutes(SCHEDULE['work_start'])
     return current < work_start
 
-def is_after_work():
+def is_after_work() -> bool:
     """Проверяет, находимся ли мы ПОСЛЕ окончания рабочего времени"""
     current = utils.get_current_time_minutes()
     work_end = utils.time_str_to_minutes(SCHEDULE['work_end'])
     return current > work_end
 
-def is_break_time():
+def is_break_time() -> Tuple[bool, Optional[str]]:
     """Проверяет, сейчас ли время перерыва"""
     current = utils.get_current_time_minutes()
 
@@ -142,14 +279,14 @@ def is_break_time():
 
     return False, None
 
-def is_after_lunch():
+def is_after_lunch() -> bool:
     """Проверяет, находимся ли мы ПОСЛЕ обеденного перерыва"""
     current = utils.get_current_time_minutes()
     lunch_end = utils.time_str_to_minutes(SCHEDULE['lunch_end'])
     return current > lunch_end
 
 
-def should_simulate_afterhours():
+def should_simulate_afterhours() -> bool:
     """Определяет, нужна ли активность вне рабочего времени"""
     mode = CONFIG['afterhours_mode']
 
@@ -163,7 +300,7 @@ def should_simulate_afterhours():
     return False
 
 
-def type_key_sequence(sequence):
+def type_key_sequence(sequence: str) -> None:
     """
     Вводит последовательность клавиш, включая специальные клавиши.
 
@@ -228,7 +365,7 @@ def type_key_sequence(sequence):
             is_performing_action = False
 
 
-def show_shutdown_warning():
+def show_shutdown_warning() -> bool:
     """Показывает всплывающее окно с предупреждением о выключении"""
     global shutdown_cancelled
     timer = None
@@ -298,7 +435,7 @@ def show_shutdown_warning():
 
 # === ФУНКЦИИ ВЫПОЛНЕНИЯ ДЕЙСТВИЙ ===
 
-def get_consecutive_safe_key_count():
+def get_consecutive_safe_key_count() -> int:
     """Возвращает количество подряд идущих safe_key действий в конце истории"""
     global action_history
     count = 0
@@ -310,7 +447,7 @@ def get_consecutive_safe_key_count():
             break
     return count
 
-def move_mouse_naturally(target_x, target_y):
+def move_mouse_naturally(target_x: int, target_y: int) -> None:
     """Плавное перемещение мыши к целевой позиции"""
     start_pos = mouse_controller.position
     dx = target_x - start_pos[0]
@@ -361,7 +498,7 @@ def move_mouse_naturally(target_x, target_y):
     with global_lock:
         is_performing_action = False
 
-def random_mouse_move():
+def random_mouse_move() -> None:
     """Случайное движение мыши в пределах заданного диапазона"""
     global initial_mouse_position
 
@@ -396,7 +533,7 @@ def random_mouse_move():
 
     initial_mouse_position = mouse_controller.position
 
-def random_arrow_press():
+def random_arrow_press() -> None:
     """Нажатие клавиш-стрелок (имитация прокрутки/навигации)"""
     global is_performing_action, is_simulating, last_activity_time, action_history
 
@@ -443,7 +580,7 @@ def random_arrow_press():
     with global_lock: is_performing_action = False
     action_history.append(('keyboard', time.time()))
 
-def random_mouse_click():
+def random_mouse_click() -> None:
     """Клик левой кнопкой мыши в текущей позиции"""
     global is_performing_action
     with global_lock:
@@ -458,7 +595,7 @@ def random_mouse_click():
     with global_lock: is_performing_action = False
     action_history.append(('mouse_click', time.time()))
 
-def safe_key_press():
+def safe_key_press() -> None:
     """Нажатие безопасной клавиши (Shift) - не производит побочных эффектов"""
     global is_performing_action
     with global_lock:
@@ -475,7 +612,7 @@ def safe_key_press():
     with global_lock: is_performing_action = False
     action_history.append(('safe_key', time.time()))
 
-def control_tab_press():
+def control_tab_press() -> None:
     """Нажатие Ctrl+Tab (переключение вкладок)"""
     global is_performing_action, is_simulating, last_activity_time, action_history
     log(f"Нажатие комбинации клавиш")
@@ -519,7 +656,9 @@ def control_tab_press():
 
 # === ФУНКЦИИ ОБРАБОТЧИКИ РЕЖИМОВ ===
 
-def _execute_burst_activity(last_burst_time_ref, burst_interval_min, burst_interval_max,
+def _execute_burst_activity(last_burst_time_ref: Optional[float],
+                            burst_interval_min: int,
+                            burst_interval_max: int,
                               burst_duration_min, burst_duration_max, mode_name,
                               time_indicator="", check_break_ended=None):
     """
@@ -643,7 +782,7 @@ def _execute_burst_activity(last_burst_time_ref, burst_interval_min, burst_inter
 
 # === ГЛАВНАЯ ФУНКЦИЯ СИМУЛЯЦИИ ===
 
-def simulate_activity():
+def simulate_activity() -> None:
     """Основной цикл симуляции активности"""
     global last_activity_time, is_simulating, initial_mouse_position, current_idle_threshold, absolute_anchor_position, lunch_sequence_executed, shutdown_cancelled, user_activity_after_work, last_break_burst_time, simulation_finished
 
@@ -1083,12 +1222,10 @@ def simulate_activity():
 
 # === ФУНКЦИЯ СТАТИСТИКИ ===
 
-def show_stats():
+def show_stats() -> None:
     """Периодический вывод статистики выполненных действий"""
     while True:
         time.sleep(300)  # Каждые 5 минут
         if len(action_history) > 0:
             recent = [a for a in action_history if time.time() - a[1] < 3600]
             log(f"[Статистика] Действий за последний час: {len(recent)}")
-            if len(action_history) > ACTION_HISTORY_CLEAR_THRESHOLD:
-                action_history.clear()

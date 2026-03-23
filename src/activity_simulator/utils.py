@@ -13,9 +13,10 @@ import tkinter as tk
 from tkinter import messagebox
 from threading import Timer
 from datetime import datetime
+from typing import List, Tuple, Union
 
 
-def time_str_to_minutes(time_str):
+def time_str_to_minutes(time_str: str) -> int:
     """
     Конвертирует строку времени 'HH:MM' в минуты с начала дня.
 
@@ -33,7 +34,7 @@ def time_str_to_minutes(time_str):
     return h * 60 + m
 
 
-def minutes_to_time_str(minutes):
+def minutes_to_time_str(minutes: int) -> str:
     """
     Конвертирует минуты с начала дня в строку 'HH:MM'.
 
@@ -52,7 +53,7 @@ def minutes_to_time_str(minutes):
     return f"{h:02d}:{m:02d}"
 
 
-def get_current_time_minutes():
+def get_current_time_minutes() -> int:
     """
     Возвращает текущее время в минутах с начала дня.
 
@@ -63,7 +64,7 @@ def get_current_time_minutes():
     return now.hour * 60 + now.minute
 
 
-def parse_key_sequence(sequence):
+def parse_key_sequence(sequence: str) -> List[str]:
     """
     Парсит строку последовательности клавиш, разделяя обычный текст и специальные клавиши.
 
@@ -109,7 +110,7 @@ def parse_key_sequence(sequence):
     return result
 
 
-def lock_computer():
+def lock_computer() -> Tuple[bool, str]:
     """Блокирует компьютер в зависимости от операционной системы"""
     system = platform.system()
 
@@ -144,7 +145,7 @@ def lock_computer():
         return False, f"⚠️ Ошибка при блокировке компьютера: {e}"
 
 
-def shutdown_computer():
+def shutdown_computer() -> Tuple[bool, str]:
     """Принудительно выключает компьютер без запроса подтверждения"""
     system = platform.system()
 
