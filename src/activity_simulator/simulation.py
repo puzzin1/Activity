@@ -53,38 +53,223 @@ class ExitSimulation(Exception):
         self.show_warning = show_warning
 
 
-# Настройка контроллеров
+# Настройка контроллеров (глобальные, так как используются только для чтения)
 mouse_controller: Controller = Controller()
 keyboard_controller: KeyboardController = KeyboardController()
 
-# --- МЕХАНИЗМ СИНХРОНИЗАЦИИ ---
-global_lock: Lock = Lock()
 
-# Переменные для отслеживания
-last_activity_time: float = time.time()
-initial_mouse_position: Optional[Tuple[int, int]] = None
-absolute_anchor_position: Optional[Tuple[int, int]] = None
-is_simulating: bool = False
-is_performing_action: bool = False
-action_history: deque[Tuple[str, float]] = deque(maxlen=ACTION_HISTORY_CLEAR_THRESHOLD)
-log_file_path: str = f"activity_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-current_idle_threshold: Optional[int] = None
-last_mouse_log_time: float = 0.0
-lunch_sequence_executed: bool = False  # Флаг для отслеживания ввода после обеда
-shutdown_cancelled: bool = False  # Флаг отмены выключения
-user_activity_after_work: bool = False  # Флаг активности пользователя после работы
-last_break_burst_time: Optional[float] = None  # Время последнего всплеска во время перерыва
-simulation_finished: bool = False  # Флаг завершения симуляции
+# === КЛАСС ИНКАПСУЛЯЦИИ ГЛОБАЛЬНОГО СОСТОЯНИЯ ===
 
-CONFIG: dict = {}
-SCHEDULE: dict = {}
+class SimulationState:
+    """
+    Инкапсулирует глобальное состояние симуляции.
+
+    Обеспечивает потокобезопасный доступ к общим переменным через
+    методы с блокировкой, вместо прямого обращения к глобальным переменным.
+    """
+
+    # Контроллеры ввода (ссылки на глобальные)
+    mouse_controller: Controller
+    keyboard_controller: KeyboardController
+
+    def __init__(self) -> None:
+        """Инициализирует состояние симуляции с начальными значениями."""
+        self._lock: Lock = Lock()
+        self._last_activity_time: float = time.time()
+        self._initial_mouse_position: Optional[Tuple[int, int]] = None
+        self._absolute_anchor_position: Optional[Tuple[int, int]] = None
+        self._is_simulating: bool = False
+        self._is_performing_action: bool = False
+        self._action_history: deque[Tuple[str, float]] = deque(maxlen=ACTION_HISTORY_CLEAR_THRESHOLD)
+        self._current_idle_threshold: Optional[int] = None
+        self._last_mouse_log_time: float = 0.0
+        self._lunch_sequence_executed: bool = False
+        self._shutdown_cancelled: bool = False
+        self._user_activity_after_work: bool = False
+        self._simulation_finished: bool = False
+        self._last_break_burst_time: Optional[float] = None
+        self._log_file_path: str = f"activity_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        self._config: dict = {}
+        self._schedule: dict = {}
+
+    # === Свойства для доступа к состоянию ===
+
+    @property
+    def lock(self) -> Lock:
+        """Возвращает блокировку для внешнего использования (например, в контекстных менеджерах)."""
+        return self._lock
+
+    @property
+    def last_activity_time(self) -> float:
+        """Время последней активности пользователя."""
+        return self._last_activity_time
+
+    @last_activity_time.setter
+    def last_activity_time(self, value: float) -> None:
+        self._last_activity_time = value
+
+    @property
+    def initial_mouse_position(self) -> Optional[Tuple[int, int]]:
+        """Начальная позиция мыши."""
+        return self._initial_mouse_position
+
+    @initial_mouse_position.setter
+    def initial_mouse_position(self, value: Optional[Tuple[int, int]]) -> None:
+        self._initial_mouse_position = value
+
+    @property
+    def absolute_anchor_position(self) -> Optional[Tuple[int, int]]:
+        """Референсная точка для ограничений движения мыши."""
+        return self._absolute_anchor_position
+
+    @absolute_anchor_position.setter
+    def absolute_anchor_position(self, value: Optional[Tuple[int, int]]) -> None:
+        self._absolute_anchor_position = value
+
+    @property
+    def is_simulating(self) -> bool:
+        """Флаг, указывающий, что симуляция активна."""
+        return self._is_simulating
+
+    @is_simulating.setter
+    def is_simulating(self, value: bool) -> None:
+        self._is_simulating = value
+
+    @property
+    def is_performing_action(self) -> bool:
+        """Флаг, указывающий, что действие выполняется."""
+        return self._is_performing_action
+
+    @is_performing_action.setter
+    def is_performing_action(self, value: bool) -> None:
+        self._is_performing_action = value
+
+    @property
+    def action_history(self) -> deque[Tuple[str, float]]:
+        """История выполненных действий."""
+        return self._action_history
+
+    @property
+    def log_file_path(self) -> str:
+        """Путь к файлу лога."""
+        return self._log_file_path
+
+    @log_file_path.setter
+    def log_file_path(self, value: str) -> None:
+        self._log_file_path = value
+
+    @property
+    def current_idle_threshold(self) -> Optional[int]:
+        """Текущий порог бездействия."""
+        return self._current_idle_threshold
+
+    @current_idle_threshold.setter
+    def current_idle_threshold(self, value: Optional[int]) -> None:
+        self._current_idle_threshold = value
+
+    @property
+    def last_mouse_log_time(self) -> float:
+        """Время последнего лога движения мыши."""
+        return self._last_mouse_log_time
+
+    @last_mouse_log_time.setter
+    def last_mouse_log_time(self, value: float) -> None:
+        self._last_mouse_log_time = value
+
+    @property
+    def lunch_sequence_executed(self) -> bool:
+        """Флаг выполнения последовательности после обеда."""
+        return self._lunch_sequence_executed
+
+    @lunch_sequence_executed.setter
+    def lunch_sequence_executed(self, value: bool) -> None:
+        self._lunch_sequence_executed = value
+
+    @property
+    def shutdown_cancelled(self) -> bool:
+        """Флаг отмены выключения."""
+        return self._shutdown_cancelled
+
+    @shutdown_cancelled.setter
+    def shutdown_cancelled(self, value: bool) -> None:
+        self._shutdown_cancelled = value
+
+    @property
+    def user_activity_after_work(self) -> bool:
+        """Флаг активности пользователя после работы."""
+        return self._user_activity_after_work
+
+    @user_activity_after_work.setter
+    def user_activity_after_work(self, value: bool) -> None:
+        self._user_activity_after_work = value
+
+    @property
+    def simulation_finished(self) -> bool:
+        """Флаг завершения симуляции."""
+        return self._simulation_finished
+
+    @simulation_finished.setter
+    def simulation_finished(self, value: bool) -> None:
+        self._simulation_finished = value
+
+    @property
+    def last_break_burst_time(self) -> Optional[float]:
+        """Время последнего всплеска во время перерыва."""
+        return self._last_break_burst_time
+
+    @last_break_burst_time.setter
+    def last_break_burst_time(self, value: Optional[float]) -> None:
+        self._last_break_burst_time = value
+
+    # === Методы для работы с конфигурацией и расписанием ===
+
+    @property
+    def config(self) -> dict:
+        """Конфигурация программы (только для чтения после инициализации)."""
+        return self._config
+
+    def set_config(self, config: dict) -> None:
+        """Устанавливает конфигурацию (вызывается один раз при запуске)."""
+        with self._lock:
+            self._config = config.copy()
+
+    @property
+    def schedule(self) -> dict:
+        """Расписание рабочего дня (только для чтения после инициализации)."""
+        return self._schedule
+
+    def set_schedule(self, schedule: dict) -> None:
+        """Устанавливает расписание (вызывается один раз при запуске)."""
+        with self._lock:
+            self._schedule = schedule.copy()
+
+    # === Контекстный менеджер для работы с блокировкой ===
+
+    def __enter__(self):
+        """Вход в контекст с блокировкой."""
+        self._lock.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Выход из контекста с разблокировкой."""
+        self._lock.release()
+
+
+# Глобальный экземпляр состояния симуляции
+_state: SimulationState = SimulationState()
+
+
+def get_state() -> SimulationState:
+    """Возвращает глобальный экземпляр состояния симуляции."""
+    return _state
 
 def setup_log_rotation() -> None:
     """Выполняет ротацию лог-файлов на основе настроек конфигурации"""
-    if CONFIG:
-        max_log_files = CONFIG.get('max_log_files', 5)
+    config = _state.config
+    if config:
+        max_log_files = config.get('max_log_files', 5)
         rotate_files('.', 'activity_log_*.txt', max_log_files,
-                     'лог-файл', exclude_file=os.path.basename(log_file_path))
+                     'лог-файл', exclude_file=os.path.basename(_state.log_file_path))
 
 
 # === КЛАСС БУФЕРИЗОВАННОГО ЛОГГАРА ===
@@ -212,9 +397,9 @@ def log(message: str, level: str = 'INFO') -> None:
         if level in ['ERROR', 'WARNING']:
             print(log_message)
 
-        if CONFIG.get('verbose_logging', True):
+        if _state.config.get('verbose_logging', True):
             try:
-                with open(log_file_path, 'a', encoding='utf-8') as f:
+                with open(_state.log_file_path, 'a', encoding='utf-8') as f:
                     f.write(log_message + '\n')
             except (OSError, IOError, PermissionError) as e:
                 print(f"Ошибка записи в лог-файл: {e}")
@@ -230,6 +415,7 @@ def init_logger(file_path: str, enabled: bool = True) -> None:
     """
     global _logger
     _logger = BufferedLogger(file_path, enabled)
+    _state.log_file_path = file_path
 
 
 def close_logger() -> None:
@@ -243,35 +429,39 @@ def close_logger() -> None:
 
 def is_work_hours() -> bool:
     """Проверяет, находимся ли мы в рабочее время"""
+    schedule = _state.schedule
     current = utils.get_current_time_minutes()
-    work_start = utils.time_str_to_minutes(SCHEDULE['work_start'])
-    work_end = utils.time_str_to_minutes(SCHEDULE['work_end'])
+    work_start = utils.time_str_to_minutes(schedule['work_start'])
+    work_end = utils.time_str_to_minutes(schedule['work_end'])
     return work_start <= current <= work_end
 
 def is_before_work() -> bool:
     """Проверяет, находимся ли мы ДО начала рабочего времени"""
+    schedule = _state.schedule
     current = utils.get_current_time_minutes()
-    work_start = utils.time_str_to_minutes(SCHEDULE['work_start'])
+    work_start = utils.time_str_to_minutes(schedule['work_start'])
     return current < work_start
 
 def is_after_work() -> bool:
-    """Проверяет, находимся ли мы ПОСЛЕ окончания рабочего времени"""
+    """Проверяем, находимся ли мы ПОСЛЕ окончания рабочего времени"""
+    schedule = _state.schedule
     current = utils.get_current_time_minutes()
-    work_end = utils.time_str_to_minutes(SCHEDULE['work_end'])
+    work_end = utils.time_str_to_minutes(schedule['work_end'])
     return current > work_end
 
 def is_break_time() -> Tuple[bool, Optional[str]]:
     """Проверяет, сейчас ли время перерыва"""
+    schedule = _state.schedule
     current = utils.get_current_time_minutes()
 
     # Проверяем обед
-    lunch_start = utils.time_str_to_minutes(SCHEDULE['lunch_start'])
-    lunch_end = utils.time_str_to_minutes(SCHEDULE['lunch_end'])
+    lunch_start = utils.time_str_to_minutes(schedule['lunch_start'])
+    lunch_end = utils.time_str_to_minutes(schedule['lunch_end'])
     if lunch_start <= current <= lunch_end:
         return True, 'обед'
 
     # Проверяем другие перерывы
-    for brk in SCHEDULE['breaks']:
+    for brk in schedule['breaks']:
         break_start = utils.time_str_to_minutes(brk['start'])
         break_end = utils.time_str_to_minutes(brk['end'])
         if break_start <= current <= break_end:
@@ -280,15 +470,16 @@ def is_break_time() -> Tuple[bool, Optional[str]]:
     return False, None
 
 def is_after_lunch() -> bool:
-    """Проверяет, находимся ли мы ПОСЛЕ обеденного перерыва"""
+    """Проверяем, находимся ли мы ПОСЛЕ обеденного перерыва"""
+    schedule = _state.schedule
     current = utils.get_current_time_minutes()
-    lunch_end = utils.time_str_to_minutes(SCHEDULE['lunch_end'])
+    lunch_end = utils.time_str_to_minutes(schedule['lunch_end'])
     return current > lunch_end
 
 
 def should_simulate_afterhours() -> bool:
     """Определяет, нужна ли активность вне рабочего времени"""
-    mode = CONFIG['afterhours_mode']
+    mode = _state.config['afterhours_mode']
 
     if mode == 'disabled':
         return False
@@ -307,19 +498,17 @@ def type_key_sequence(sequence: str) -> None:
     Args:
         sequence (str): Строка с последовательностью, например "text{Enter}{Tab}"
     """
-    global is_performing_action
-
     if not sequence:
         return
 
-    with global_lock:
-        if user_activity_after_work:
+    with _state.lock:
+        if _state.user_activity_after_work:
             return
 
     log(f"🔑 Начало ввода последовательности клавиш")
 
-    with global_lock:
-        is_performing_action = True
+    with _state.lock:
+        _state.is_performing_action = True
 
     try:
         parsed = utils.parse_key_sequence(sequence)
@@ -361,19 +550,17 @@ def type_key_sequence(sequence: str) -> None:
         log(f"❌ Ошибка при вводе последовательности: {e}", 'ERROR')
 
     finally:
-        with global_lock:
-            is_performing_action = False
+        with _state.lock:
+            _state.is_performing_action = False
 
 
 def show_shutdown_warning() -> bool:
     """Показывает всплывающее окно с предупреждением о выключении"""
-    global shutdown_cancelled
     timer = None
 
     def on_cancel():
-        global shutdown_cancelled
         nonlocal timer
-        shutdown_cancelled = True
+        _state.shutdown_cancelled = True
         log("⚠️ Выключение отменено пользователем")
         if timer is not None:
             try:
@@ -408,10 +595,10 @@ def show_shutdown_warning() -> bool:
     # Текст предупреждения
     warning_text = f"⚠️ ВНИМАНИЕ!\n\nРабочий день завершен.\n"
 
-    if CONFIG.get('shutdown_on_exit', False):
-        warning_text += f"Компьютер будет ВЫКЛЮЧЕН через {CONFIG.get('shutdown_warning_time', 30)} секунд."
+    if _state.config.get('shutdown_on_exit', False):
+        warning_text += f"Компьютер будет ВЫКЛЮЧЕН через {_state.config.get('shutdown_warning_time', 30)} секунд."
     else:
-        warning_text += f"Компьютер будет ЗАБЛОКИРОВАН через {CONFIG.get('shutdown_warning_time', 30)} секунд."
+        warning_text += f"Компьютер будет ЗАБЛОКИРОВАН через {_state.config.get('shutdown_warning_time', 30)} секунд."
 
     label = tk.Label(root, text=warning_text, font=("Arial", 12), pady=20)
     label.pack()
@@ -423,24 +610,23 @@ def show_shutdown_warning() -> bool:
     cancel_btn.pack(pady=10)
 
     # Автоматическое закрытие через заданное время
-    timer = Timer(CONFIG.get('shutdown_warning_time', 30), on_timeout)
+    timer = Timer(_state.config.get('shutdown_warning_time', 30), on_timeout)
     timer.daemon = True
     timer.start()
 
     # Запускаем окно
     root.mainloop()
 
-    return not shutdown_cancelled
+    return not _state.shutdown_cancelled
 
 
 # === ФУНКЦИИ ВЫПОЛНЕНИЯ ДЕЙСТВИЙ ===
 
 def get_consecutive_safe_key_count() -> int:
     """Возвращает количество подряд идущих safe_key действий в конце истории"""
-    global action_history
     count = 0
     # Идем с конца истории и считаем последовательные safe_key
-    for action_type, _ in reversed(action_history):
+    for action_type, _ in reversed(_state._state.action_history):
         if action_type == 'safe_key':
             count += 1
         else:
@@ -452,34 +638,34 @@ def move_mouse_naturally(target_x: int, target_y: int) -> None:
     start_pos = mouse_controller.position
     dx = target_x - start_pos[0]
     dy = target_y - start_pos[1]
-    steps = CONFIG['smooth_move_steps']
+    config = _state.config
+    steps = config['smooth_move_steps']
 
-    global is_performing_action, is_simulating, last_activity_time, action_history
-    with global_lock:
-        is_performing_action = True
-        action_start_time = last_activity_time
+    with _state.lock:
+        _state.is_performing_action = True
+        action_start_time = _state.last_activity_time
 
     for step in range(steps):
         # Проверяем активность пользователя на каждом шаге
-        with global_lock:
-            if last_activity_time > action_start_time:
+        with _state.lock:
+            if _state.last_activity_time > action_start_time:
                 # Пользователь проявил активность - прерываем движение
                 # Добавляем запись в историю, чтобы сбросить счетчик последовательных safe_key
-                action_history.append(('mouse_move', time.time()))
-                is_performing_action = False
-                is_simulating = False
+                _state._state.action_history.append(('mouse_move', time.time()))
+                _state.is_performing_action = False
+                _state.is_simulating = False
                 log(f"⚠️ Движение мыши прервано активностью пользователя (шаг {step}/{steps})", 'INFO')
                 return
             # Проверка активности пользователя после работы
-            if user_activity_after_work:
-                action_history.append(('mouse_move', time.time()))
-                is_performing_action = False
-                is_simulating = False
+            if _state.user_activity_after_work:
+                _state._state.action_history.append(('mouse_move', time.time()))
+                _state.is_performing_action = False
+                _state.is_simulating = False
                 log(f"🚪 Движение мыши прервано активностью пользователя после рабочего дня (шаг {step}/{steps})", 'INFO')
                 return
 
         t = step / steps
-        if CONFIG['natural_behavior']:
+        if config['natural_behavior']:
             # Кривая ease-in-out для более естественного движения
             t = t * t * (3 - 2 * t)
 
@@ -487,24 +673,23 @@ def move_mouse_naturally(target_x: int, target_y: int) -> None:
         new_y = start_pos[1] + (dy * t)
         mouse_controller.position = (new_x, new_y)
 
-        sleep_time = CONFIG['smooth_move_duration'] / steps
-        if CONFIG['natural_behavior'] and random.random() < 0.1:
+        sleep_time = config['smooth_move_duration'] / steps
+        if config['natural_behavior'] and random.random() < 0.1:
             sleep_time *= random.uniform(1.2, 1.5)
 
         time.sleep(sleep_time)
 
     mouse_controller.position = (target_x, target_y)
 
-    with global_lock:
-        is_performing_action = False
+    with _state.lock:
+        _state.is_performing_action = False
 
 def random_mouse_move() -> None:
     """Случайное движение мыши в пределах заданного диапазона"""
-    global initial_mouse_position
+    config = _state.config
+    max_range_relative = config['max_mouse_range']
 
-    max_range_relative = CONFIG['max_mouse_range']
-
-    if CONFIG['natural_behavior']:
+    if config['natural_behavior']:
         # Треугольное распределение дает больше движений ближе к центру
         offset_x = random.randint(-max_range_relative, max_range_relative) * random.triangular(0.1, 1.0, 0.4)
         offset_y = random.randint(-max_range_relative, max_range_relative) * random.triangular(0.1, 1.0, 0.4)
@@ -514,30 +699,30 @@ def random_mouse_move() -> None:
         offset_x = random.randint(-max_range_relative, max_range_relative)
         offset_y = random.randint(-max_range_relative, max_range_relative)
 
-    target_x = initial_mouse_position[0] + offset_x
-    target_y = initial_mouse_position[1] + offset_y
+    target_x = _state.initial_mouse_position[0] + offset_x
+    target_y = _state.initial_mouse_position[1] + offset_y
 
     # Ограничение дрифта от начальной точки симуляции
-    with global_lock:
-        if absolute_anchor_position is not None:
-            anchor_x = absolute_anchor_position[0]
-            anchor_y = absolute_anchor_position[1]
-            max_abs_range = CONFIG['max_mouse_range']
+    with _state.lock:
+        if _state.absolute_anchor_position is not None:
+            anchor_x = _state.absolute_anchor_position[0]
+            anchor_y = _state.absolute_anchor_position[1]
+            max_abs_range = config['max_mouse_range']
 
             target_x = max(anchor_x - max_abs_range, min(target_x, anchor_x + max_abs_range))
             target_y = max(anchor_y - max_abs_range, min(target_y, anchor_y + max_abs_range))
 
-    log(f"Движение мыши: ({initial_mouse_position[0]}, {initial_mouse_position[1]}) -> ({target_x}, {target_y})")
+    log(f"Движение мыши: ({_state.initial_mouse_position[0]}, {_state.initial_mouse_position[1]}) -> ({target_x}, {target_y})")
     move_mouse_naturally(target_x, target_y)
-    action_history.append(('mouse_move', time.time()))
+    _state._state.action_history.append(('mouse_move', time.time()))
 
-    initial_mouse_position = mouse_controller.position
+    _state.initial_mouse_position = mouse_controller.position
 
 def random_arrow_press() -> None:
     """Нажатие клавиш-стрелок (имитация прокрутки/навигации)"""
-    global is_performing_action, is_simulating, last_activity_time, action_history
+    config = _state.config
 
-    if CONFIG['natural_behavior']:
+    if config['natural_behavior']:
         # Больший вес для up/down (вертикальная прокрутка популярнее)
         arrows = [Key.up, Key.down, Key.up, Key.down, Key.left, Key.right]
     else:
@@ -545,29 +730,29 @@ def random_arrow_press() -> None:
 
     arrow = random.choice(arrows)
 
-    repetitions = random.randint(CONFIG['min_key_presses'], CONFIG['max_key_presses'])
+    repetitions = random.randint(config['min_key_presses'], config['max_key_presses'])
     log(f"Нажатие стрелки (x{repetitions})")
 
-    with global_lock:
-        is_performing_action = True
-        action_start_time = last_activity_time  # Запоминаем время начала действия
+    with _state.lock:
+        _state.is_performing_action = True
+        action_start_time = _state.last_activity_time
 
     for i in range(repetitions):
         # Проверяем, не было ли активности пользователя
-        with global_lock:
-            if last_activity_time > action_start_time:
+        with _state.lock:
+            if _state.last_activity_time > action_start_time:
                 # Пользователь проявил активность - прерываем серию
                 log(f"⚠️ Серия нажатий прервана активностью пользователя (выполнено {i}/{repetitions})", 'INFO')
                 # Добавляем запись в историю, чтобы сбросить счетчик последовательных safe_key
-                action_history.append(('keyboard', time.time()))
-                is_performing_action = False
-                is_simulating = False
+                _state._state.action_history.append(('keyboard', time.time()))
+                _state.is_performing_action = False
+                _state.is_simulating = False
                 return
             # Проверка активности пользователя после работы
-            if user_activity_after_work:
+            if _state.user_activity_after_work:
                 log(f"🚪 Серия нажатий прервана активностью пользователя после рабочего дня (выполнено {i}/{repetitions})", 'INFO')
-                is_performing_action = False
-                is_simulating = False
+                _state.is_performing_action = False
+                _state.is_simulating = False
                 return
 
         keyboard_controller.press(arrow)
@@ -577,70 +762,72 @@ def random_arrow_press() -> None:
         if i < repetitions - 1:
             time.sleep(random.uniform(0.1, 0.3))
 
-    with global_lock: is_performing_action = False
-    action_history.append(('keyboard', time.time()))
+    with _state.lock:
+        _state.is_performing_action = False
+    _state._state.action_history.append(('keyboard', time.time()))
 
 def random_mouse_click() -> None:
     """Клик левой кнопкой мыши в текущей позиции"""
-    global is_performing_action
-    with global_lock:
-        if user_activity_after_work:
+    with _state.lock:
+        if _state.user_activity_after_work:
             return
     log(f"Клик левой кнопкой мыши в текущей позиции")
 
-    with global_lock: is_performing_action = True
+    with _state.lock:
+        _state.is_performing_action = True
 
     mouse_controller.click(Button.left, 1)
 
-    with global_lock: is_performing_action = False
-    action_history.append(('mouse_click', time.time()))
+    with _state.lock:
+        _state.is_performing_action = False
+    _state._state.action_history.append(('mouse_click', time.time()))
 
 def safe_key_press() -> None:
     """Нажатие безопасной клавиши (Shift) - не производит побочных эффектов"""
-    global is_performing_action
-    with global_lock:
-        if user_activity_after_work:
+    with _state.lock:
+        if _state.user_activity_after_work:
             return
     log(f"Нажатие безопасной клавиши")
 
-    with global_lock: is_performing_action = True
+    with _state.lock:
+        _state.is_performing_action = True
 
     keyboard_controller.press(Key.shift)
     time.sleep(0.05)
     keyboard_controller.release(Key.shift)
 
-    with global_lock: is_performing_action = False
-    action_history.append(('safe_key', time.time()))
+    with _state.lock:
+        _state.is_performing_action = False
+    _state._state.action_history.append(('safe_key', time.time()))
 
 def control_tab_press() -> None:
     """Нажатие Ctrl+Tab (переключение вкладок)"""
-    global is_performing_action, is_simulating, last_activity_time, action_history
     log(f"Нажатие комбинации клавиш")
 
-    with global_lock:
-        is_performing_action = True
-        action_start_time = last_activity_time
+    with _state.lock:
+        _state.is_performing_action = True
+        action_start_time = _state.last_activity_time
 
     keyboard_controller.press(Key.ctrl_l)
     time.sleep(random.uniform(0.05, 0.15))
 
     # Проверяем активность пользователя перед нажатием Tab
-    with global_lock:
-        if last_activity_time > action_start_time:
+    with _state.lock:
+        if _state.last_activity_time > action_start_time:
             # Пользователь проявил активность - отменяем действие
             keyboard_controller.release(Key.ctrl_l)
             # Добавляем запись в историю, чтобы сбросить счетчик последовательных safe_key
-            action_history.append(('ctrl_tab', time.time()))
-            is_performing_action = False
-            is_simulating = False
+            _state._state.action_history.append(('ctrl_tab', time.time()))
+            _state.is_performing_action = False
+            _state.is_simulating = False
             log(f"⚠️ Комбинация клавиш прервана активностью пользователя", 'INFO')
             return
         # Проверка активности пользователя после работы
-        if user_activity_after_work:
+        if _state.user_activity_after_work:
             keyboard_controller.release(Key.ctrl_l)
-            action_history.append(('ctrl_tab', time.time()))
-            is_performing_action = False
-            is_simulating = False
+            _state._state.action_history.append(('ctrl_tab', time.time()))
+            _state.is_performing_action = False
+            _state.is_simulating = False
             log(f"🚪 Комбинация клавиш прервана активностью пользователя после рабочего дня", 'INFO')
             return
 
@@ -650,8 +837,9 @@ def control_tab_press() -> None:
     time.sleep(random.uniform(0.05, 0.15))
     keyboard_controller.release(Key.ctrl_l)
 
-    with global_lock: is_performing_action = False
-    action_history.append(('ctrl_tab', time.time()))
+    with _state.lock:
+        _state.is_performing_action = False
+    _state._state.action_history.append(('ctrl_tab', time.time()))
 
 
 # === ФУНКЦИИ ОБРАБОТЧИКИ РЕЖИМОВ ===
@@ -679,8 +867,7 @@ def _execute_burst_activity(last_burst_time_ref: Optional[float],
     Returns:
         str: 'completed', 'interrupted', 'ended', или 'waiting'
     """
-    global initial_mouse_position, absolute_anchor_position, is_simulating, last_activity_time
-
+    config = _state.config
     current_last_burst = last_burst_time_ref[0]
     time_since_burst = time.time() - current_last_burst
     burst_interval = random.uniform(
@@ -689,8 +876,8 @@ def _execute_burst_activity(last_burst_time_ref: Optional[float],
     )
 
     # Проверяем, прошло ли минимум MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд с последней активности пользователя
-    with global_lock:
-        time_since_user_activity = time.time() - last_activity_time
+    with _state.lock:
+        time_since_user_activity = time.time() - _state.last_activity_time
 
     if time_since_burst >= burst_interval and time_since_user_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
         burst_duration = random.uniform(burst_duration_min, burst_duration_max)
@@ -699,10 +886,10 @@ def _execute_burst_activity(last_burst_time_ref: Optional[float],
 
         burst_end_time = time.time() + burst_duration
 
-        with global_lock:
-            absolute_anchor_position = mouse_controller.position
-            initial_mouse_position = mouse_controller.position
-            is_simulating = True
+        with _state.lock:
+            _state.absolute_anchor_position = mouse_controller.position
+            _state.initial_mouse_position = mouse_controller.position
+            _state.is_simulating = True
 
         burst_interrupted = False
         burst_completed = False
@@ -716,13 +903,12 @@ def _execute_burst_activity(last_burst_time_ref: Optional[float],
                     return 'ended'
 
             # Проверка активности пользователя после работы
-            with global_lock:
-                if user_activity_after_work:
-                    log(f"🚪 {mode_name}: прерывание всплеска из-за активности пользователя после рабочего дня")
-                    burst_interrupted = True
-                    with global_lock:
-                        is_simulating = False
-                    break
+            if _state.user_activity_after_work:
+                log(f"🚪 {mode_name}: прерывание всплеска из-за активности пользователя после рабочего дня")
+                burst_interrupted = True
+                with _state.lock:
+                    _state.is_simulating = False
+                break
 
             # Выполняем легкую активность
             # Избегаем 5 подряд нажатий Shift
@@ -730,7 +916,7 @@ def _execute_burst_activity(last_burst_time_ref: Optional[float],
             available_actions = []
 
             # Проверяем, доступно ли движение мыши
-            if CONFIG['use_mouse_move']:
+            if config['use_mouse_move']:
                 available_actions.append('mouse_move')
 
             # Всегда добавляем safe_key, но ограничим если уже 4 подряд
@@ -752,16 +938,16 @@ def _execute_burst_activity(last_burst_time_ref: Optional[float],
             except Exception as e:
                 log(f"Ошибка при выполнении действия: {e}", 'ERROR')
 
-            with global_lock:
-                last_activity_time = time.time()
+            with _state.lock:
+                _state.last_activity_time = time.time()
 
             time.sleep(random.uniform(2, 5))
         else:
             # Цикл завершился без break (время всплеска истекло)
             burst_completed = True
 
-        with global_lock:
-            is_simulating = False
+        with _state.lock:
+            _state.is_simulating = False
 
         if burst_interrupted:
             return 'interrupted'
@@ -784,107 +970,104 @@ def _execute_burst_activity(last_burst_time_ref: Optional[float],
 
 def simulate_activity() -> None:
     """Основной цикл симуляции активности"""
-    global last_activity_time, is_simulating, initial_mouse_position, current_idle_threshold, absolute_anchor_position, lunch_sequence_executed, shutdown_cancelled, user_activity_after_work, last_break_burst_time, simulation_finished
-
     last_burst_time = time.time()
-    last_break_burst_time = time.time()
+    last_break_burst_time_list = [time.time()]  # Используем список для мутации
+    config = _state.config
 
     while True:
         # Проверка активности пользователя после работы
-        with global_lock:
-            if user_activity_after_work:
-                log("🚪 Завершение программы из-за активности пользователя после рабочего дня")
-                print("\n" + "=" * 70)
-                print("🚪 ОБНАРУЖЕНА АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ")
-                print("=" * 70)
-                print("Программа завершена без блокировки/выключения компьютера")
-                if CONFIG['verbose_logging']:
-                    print(f"📄 Лог сохранён в файл: {log_file_path}")
-                print("=" * 70)
-                time.sleep(1)
-                simulation_finished = True
-                raise ExitSimulation("Активность пользователя после рабочего дня")
+        if _state.user_activity_after_work:
+            log("🚪 Завершение программы из-за активности пользователя после рабочего дня")
+            print("\n" + "=" * 70)
+            print("🚪 ОБНАРУЖЕНА АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ")
+            print("=" * 70)
+            print("Программа завершена без блокировки/выключения компьютера")
+            if config['verbose_logging']:
+                print(f"📄 Лог сохранён в файл: {_state.log_file_path}")
+            print("=" * 70)
+            time.sleep(1)
+            _state.simulation_finished = True
+            raise ExitSimulation("Активность пользователя после рабочего дня")
 
         # Проверяем режим работы
         in_work_hours = is_work_hours()
         on_break, break_type = is_break_time()
 
         # === ПРОВЕРКА И ВЫПОЛНЕНИЕ ДЕЙСТВИЙ ПОСЛЕ ОБЕДА ===
-        if CONFIG.get('after_lunch_action', False) and not lunch_sequence_executed:
+        if config.get('after_lunch_action', False) and not _state.lunch_sequence_executed:
             # Проверяем, прошел ли обед и находимся ли мы после него
             if in_work_hours and is_after_lunch() and not on_break:
-                log(f"🍽️ Обеденный перерыв завершен. Ожидание {CONFIG.get('after_lunch_delay', 5)} сек...")
-                time.sleep(CONFIG.get('after_lunch_delay', 5))
+                log(f"🍽️ Обеденный перерыв завершен. Ожидание {config.get('after_lunch_delay', 5)} сек...")
+                time.sleep(config.get('after_lunch_delay', 5))
 
                 # Вводим последовательность клавиш
-                sequence = CONFIG.get('after_lunch_sequence', '')
+                sequence = config.get('after_lunch_sequence', '')
                 if sequence:
                     type_key_sequence(sequence)
-                    lunch_sequence_executed = True
+                    _state.lunch_sequence_executed = True
 
                     # Обновляем время активности
-                    with global_lock:
-                        last_activity_time = time.time()
+                    with _state.lock:
+                        _state.last_activity_time = time.time()
                 else:
                     log(f"⚠️ Последовательность после обеда не задана", 'WARNING')
-                    lunch_sequence_executed = True
+                    _state.lunch_sequence_executed = True
 
         # === РЕЖИМ ВНЕ РАБОЧЕГО ВРЕМЕНИ ===
         if not in_work_hours:
             # Проверяем, нужна ли активность вне рабочего времени
             if not should_simulate_afterhours():
                 # Проверка активности пользователя после работы
-                with global_lock:
-                    if user_activity_after_work:
-                        log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
-                        print("\n" + "=" * 70)
-                        print("🚪 ОБНАРУЖЕНА АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ")
-                        print("=" * 70)
-                        print("Программа завершена без блокировки/выключения компьютера")
-                        if CONFIG['verbose_logging']:
-                            print(f"📄 Лог сохранён в файл: {log_file_path}")
-                        print("=" * 70)
-                        time.sleep(1)
-                        simulation_finished = True
-                        raise ExitSimulation("Активность пользователя после рабочего дня (внерабочий)")
+                if _state.user_activity_after_work:
+                    log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
+                    print("\n" + "=" * 70)
+                    print("🚪 ОБНАРУЖЕНА АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ")
+                    print("=" * 70)
+                    print("Программа завершена без блокировки/выключения компьютера")
+                    if config['verbose_logging']:
+                        print(f"📄 Лог сохранён в файл: {_state.log_file_path}")
+                    print("=" * 70)
+                    time.sleep(1)
+                    _state.simulation_finished = True
+                    raise ExitSimulation("Активность пользователя после рабочего дня (внерабочий)")
                 # Если мы ПОСЛЕ работы и активность отключена - завершаем программу
                 if is_after_work():
-                    log(f"🏁 Рабочий день завершен. Программа останавливается (режим: {CONFIG['afterhours_mode']})")
+                    log(f"🏁 Рабочий день завершен. Программа останавливается (режим: {config['afterhours_mode']})")
 
                     # Показываем предупреждение, если включено
                     should_proceed = True
-                    if CONFIG.get('show_shutdown_warning', True):
+                    if config.get('show_shutdown_warning', True):
                         print(f"\n⏰ Показ предупреждения о завершении работы...")
                         log("⏰ Показ предупреждения о завершении работы")
                         should_proceed = show_shutdown_warning()
 
-                    if not should_proceed or shutdown_cancelled:
+                    if not should_proceed or _state.shutdown_cancelled:
                         log("✋ Завершение работы отменено пользователем")
                         print("\n✋ Завершение работы отменено")
                         # Продолжаем работу в режиме ожидания
                         time.sleep(60)
-                        shutdown_cancelled = False
-                        with global_lock:
-                            user_activity_after_work = False
+                        _state.shutdown_cancelled = False
+                        with _state.lock:
+                            _state.user_activity_after_work = False
                         continue
 
                     print("\n" + "=" * 70)
                     print("🏁 РАБОЧИЙ ДЕНЬ ЗАВЕРШЕН")
                     print("=" * 70)
                     print(f"⏰ Время окончания: {datetime.now().strftime('%H:%M:%S')}")
-                    if CONFIG['verbose_logging']:
-                        print(f"📄 Лог сохранён в файл: {log_file_path}")
+                    if config['verbose_logging']:
+                        print(f"📄 Лог сохранён в файл: {_state.log_file_path}")
 
                     # Логируем статистику в файл
-                    log(f"Всего выполнено действий: {len(action_history)}")
+                    log(f"Всего выполнено действий: {len(_state._state.action_history)}")
 
                     # Выключение или блокировка компьютера при АВТОМАТИЧЕСКОМ завершении
-                    if CONFIG.get('shutdown_on_exit', False):
+                    if config.get('shutdown_on_exit', False):
                         print("🔌 ВЫКЛЮЧЕНИЕ КОМПЬЮТЕРА...")
                         time.sleep(1)
                         success, message = utils.shutdown_computer()
                         log(message)
-                    elif CONFIG.get('lock_on_exit', True):
+                    elif config.get('lock_on_exit', True):
                         print("🔒 Блокировка компьютера...")
                         time.sleep(1)
                         success, message = utils.lock_computer()
@@ -892,32 +1075,32 @@ def simulate_activity() -> None:
 
                     print("=" * 70)
                     time.sleep(1)  # Задержка перед завершением
-                    simulation_finished = True
+                    _state.simulation_finished = True
                     raise ExitSimulation("Рабочий день завершен", show_warning=False)
 
                 # Если мы ДО работы - просто ждем
-                if is_simulating:
-                    with global_lock:
-                        is_simulating = False
-                    log(f"🌙 Внерабочее время. Активность отключена (режим: {CONFIG['afterhours_mode']})")
+                if _state.is_simulating:
+                    with _state.lock:
+                        _state.is_simulating = False
+                    log(f"🌙 Внерабочее время. Активность отключена (режим: {config['afterhours_mode']})")
                 time.sleep(60)
                 continue
 
             # Режим всплесков активности
             time_since_burst = time.time() - last_burst_time
             burst_interval = random.uniform(
-                CONFIG['afterhours_burst_interval_min'] * 60,
-                CONFIG['afterhours_burst_interval_max'] * 60
+                config['afterhours_burst_interval_min'] * 60,
+                config['afterhours_burst_interval_max'] * 60
             )
 
             # Проверяем, прошло ли минимум MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд с последней активности пользователя
-            with global_lock:
-                time_since_user_activity = time.time() - last_activity_time
+            with _state.lock:
+                time_since_user_activity = time.time() - _state.last_activity_time
 
             if time_since_burst >= burst_interval and time_since_user_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
                 burst_duration = random.uniform(
-                    CONFIG['afterhours_burst_duration_min'],
-                    CONFIG['afterhours_burst_duration_max']
+                    config['afterhours_burst_duration_min'],
+                    config['afterhours_burst_duration_max']
                 )
 
                 time_indicator = "🌅" if is_before_work() else "🌙"
@@ -925,20 +1108,20 @@ def simulate_activity() -> None:
 
                 burst_end_time = time.time() + burst_duration
 
-                with global_lock:
-                    absolute_anchor_position = mouse_controller.position
-                    initial_mouse_position = mouse_controller.position
-                    is_simulating = True
+                with _state.lock:
+                    _state.absolute_anchor_position = mouse_controller.position
+                    _state.initial_mouse_position = mouse_controller.position
+                    _state.is_simulating = True
 
                 burst_interrupted = False
                 while time.time() < burst_end_time:
                     # Проверка активности пользователя после работы
-                    with global_lock:
-                        if user_activity_after_work:
+                    with _state.lock:
+                        if _state.user_activity_after_work:
                             log("🚪 Внерабочий режим: прерывание всплеска из-за активности пользователя после рабочего дня")
                             burst_interrupted = True
-                            with global_lock:
-                                is_simulating = False
+                            with _state.lock:
+                                _state.is_simulating = False
                             break
                     # Выполняем легкую активность
                     # Избегаем 5 подряд нажатий Shift
@@ -946,7 +1129,7 @@ def simulate_activity() -> None:
                     available_actions = []
 
                     # Проверяем, доступно ли движение мыши
-                    if CONFIG['use_mouse_move']:
+                    if config['use_mouse_move']:
                         available_actions.append('mouse_move')
 
                     # Всегда добавляем safe_key, но ограничим если уже 4 подряд
@@ -969,13 +1152,13 @@ def simulate_activity() -> None:
                     except Exception as e:
                         log(f"Ошибка при выполнении действия: {e}", 'ERROR')
 
-                    with global_lock:
-                        last_activity_time = time.time()
+                    with _state.lock:
+                        _state.last_activity_time = time.time()
 
                     time.sleep(random.uniform(2, 5))
 
-                with global_lock:
-                    is_simulating = False
+                with _state.lock:
+                    _state.is_simulating = False
 
                 if burst_interrupted:
                     continue
@@ -993,36 +1176,36 @@ def simulate_activity() -> None:
 
         # === РЕЖИМ ПЕРЕРЫВА ===
         if on_break:
-            if is_simulating:
-                with global_lock:
-                    is_simulating = False
+            if _state.is_simulating:
+                with _state.lock:
+                    _state.is_simulating = False
                 log(f"☕ Перерыв ({break_type}). Переход в режим легкой активности.")
 
             # Логика всплесков активности во время перерыва (аналогично внерабочему режиму)
             time_since_break_burst = time.time() - last_break_burst_time
             burst_interval = random.uniform(
-                CONFIG['afterhours_burst_interval_min'] * 60,
-                CONFIG['afterhours_burst_interval_max'] * 60
+                config['afterhours_burst_interval_min'] * 60,
+                config['afterhours_burst_interval_max'] * 60
             )
 
             # Проверяем, прошло ли минимум MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд с последней активности пользователя
-            with global_lock:
-                time_since_user_activity = time.time() - last_activity_time
+            with _state.lock:
+                time_since_user_activity = time.time() - _state.last_activity_time
 
             if time_since_break_burst >= burst_interval and time_since_user_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
                 burst_duration = random.uniform(
-                    CONFIG['afterhours_burst_duration_min'],
-                    CONFIG['afterhours_burst_duration_max']
+                    config['afterhours_burst_duration_min'],
+                    config['afterhours_burst_duration_max']
                 )
 
                 log(f"☕ Перерыв ({break_type}): всплеск активности на {burst_duration:.0f} сек")
 
                 burst_end_time = time.time() + burst_duration
 
-                with global_lock:
-                    absolute_anchor_position = mouse_controller.position
-                    initial_mouse_position = mouse_controller.position
-                    is_simulating = True
+                with _state.lock:
+                    _state.absolute_anchor_position = mouse_controller.position
+                    _state.initial_mouse_position = mouse_controller.position
+                    _state.is_simulating = True
 
                 burst_completed = False
                 break_ended = False
@@ -1037,8 +1220,8 @@ def simulate_activity() -> None:
                         break
 
                     # Проверка активности пользователя после работы
-                    with global_lock:
-                        if user_activity_after_work:
+                    with _state.lock:
+                        if _state.user_activity_after_work:
                             log("🚪 Режим перерыва: прерывание всплеска из-за активности пользователя после рабочего дня")
                             burst_interrupted = True
                             break
@@ -1049,7 +1232,7 @@ def simulate_activity() -> None:
                     available_actions = []
 
                     # Проверяем, доступно ли движение мыши
-                    if CONFIG['use_mouse_move']:
+                    if config['use_mouse_move']:
                         available_actions.append('mouse_move')
 
                     # Всегда добавляем safe_key, но ограничим если уже 4 подряд
@@ -1072,16 +1255,16 @@ def simulate_activity() -> None:
                     except Exception as e:
                         log(f"Ошибка при выполнении действия: {e}", 'ERROR')
 
-                    with global_lock:
-                        last_activity_time = time.time()
+                    with _state.lock:
+                        _state.last_activity_time = time.time()
 
                     time.sleep(random.uniform(2, 5))
                 else:
                     # Цикл завершился без break (время всплеска истекло)
                     burst_completed = True
 
-                with global_lock:
-                    is_simulating = False
+                with _state.lock:
+                    _state.is_simulating = False
 
                 if burst_interrupted:
                     continue
@@ -1104,17 +1287,17 @@ def simulate_activity() -> None:
             continue
 
         # === ОБЫЧНЫЙ РАБОЧИЙ РЕЖИМ ===
-        with global_lock:
-            time_since_last_activity = time.time() - last_activity_time
-            current_idle_threshold_local = current_idle_threshold
-            is_simulating_local = is_simulating
+        with _state.lock:
+            time_since_last_activity = time.time() - _state.last_activity_time
+            current_idle_threshold_local = _state.current_idle_threshold
+            _state.is_simulating = _state.is_simulating
 
         # Генерация нового порога бездействия
         if current_idle_threshold_local is None:
-            new_threshold = random.randint(CONFIG['min_idle_time'], CONFIG['max_idle_time'])
-            with global_lock:
-                current_idle_threshold = new_threshold
-                current_idle_threshold_local = current_idle_threshold
+            new_threshold = random.randint(config['min_idle_time'], config['max_idle_time'])
+            with _state.lock:
+                _state.current_idle_threshold = new_threshold
+                current_idle_threshold_local = _state.current_idle_threshold
             log(f"Установлен новый порог бездействия: {current_idle_threshold_local} сек", 'DEBUG')
 
         # КРИТИЧЕСКИ ВАЖНО: Минимальная задержка MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд после любой активности пользователя
@@ -1123,32 +1306,32 @@ def simulate_activity() -> None:
         # 1. Прошло минимум 60 секунд с последней активности пользователя
         # 2. И прошло достаточно времени согласно порогу бездействия
         if time_since_last_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY and \
-           (is_simulating_local or time_since_last_activity >= current_idle_threshold_local):
+           (_state.is_simulating or time_since_last_activity >= current_idle_threshold_local):
 
             # Начало симуляции
-            if not is_simulating_local:
-                with global_lock:
-                    absolute_anchor_position = mouse_controller.position
-                    initial_mouse_position = mouse_controller.position
-                    is_simulating = True
-                    is_simulating_local = True
+            if not _state.is_simulating:
+                with _state.lock:
+                    _state.absolute_anchor_position = mouse_controller.position
+                    _state.initial_mouse_position = mouse_controller.position
+                    _state.is_simulating = True
+                    _state.is_simulating = True
                 log(f"💼 Начало симуляции активности (бездействие: {time_since_last_activity:.1f} сек)")
 
             # Формирование списка доступных действий с весами
             available_actions = []
 
-            if CONFIG['use_mouse_move']:
-                available_actions.extend(['mouse_move'] * CONFIG['action_weight_mouse_move'])
+            if config['use_mouse_move']:
+                available_actions.extend(['mouse_move'] * config['action_weight_mouse_move'])
 
-            if CONFIG['use_keyboard']:
-                available_actions.extend(['keyboard'] * CONFIG['action_weight_keyboard'])
-                available_actions.extend(['ctrl_tab'] * CONFIG['action_weight_ctrl_tab'])
+            if config['use_keyboard']:
+                available_actions.extend(['keyboard'] * config['action_weight_keyboard'])
+                available_actions.extend(['ctrl_tab'] * config['action_weight_ctrl_tab'])
 
-            if CONFIG['use_mouse_click']:
-                available_actions.extend(['mouse_click'] * CONFIG['action_weight_mouse_click'])
+            if config['use_mouse_click']:
+                available_actions.extend(['mouse_click'] * config['action_weight_mouse_click'])
 
-            if CONFIG['natural_behavior']:
-                available_actions.extend(['safe_key'] * CONFIG['action_weight_safe_key'])
+            if config['natural_behavior']:
+                available_actions.extend(['safe_key'] * config['action_weight_safe_key'])
 
             if not available_actions:
                 available_actions = ['safe_key']
@@ -1185,17 +1368,17 @@ def simulate_activity() -> None:
                 log(f"Ошибка при выполнении действия: {e}", 'ERROR')
 
             # Обновление времени активности
-            with global_lock:
-                last_activity_time = time.time()
+            with _state.lock:
+                _state.last_activity_time = time.time()
 
             # Расчет паузы до следующего действия
             action_interval = random.uniform(
-                CONFIG['min_action_interval'],
-                CONFIG['max_action_interval']
+                config['min_action_interval'],
+                config['max_action_interval']
             )
 
             # Случайное увеличение паузы для естественности
-            if CONFIG['natural_behavior'] and random.random() < 0.15:
+            if config['natural_behavior'] and random.random() < 0.15:
                 action_interval *= random.uniform(1.5, 2.5)
                 log(f"Увеличенная пауза: {action_interval:.1f} сек", 'DEBUG')
 
@@ -1204,9 +1387,9 @@ def simulate_activity() -> None:
 
         else:
             # Режим ожидания
-            if is_simulating_local:
-                 with global_lock:
-                    if not is_simulating:
+            if _state.is_simulating:
+                 with _state.lock:
+                    if not _state.is_simulating:
                         log("Симуляция прервана активностью пользователя.", 'INFO')
 
             # Показываем оставшееся время с учетом минимальной задержки
@@ -1226,6 +1409,6 @@ def show_stats() -> None:
     """Периодический вывод статистики выполненных действий"""
     while True:
         time.sleep(300)  # Каждые 5 минут
-        if len(action_history) > 0:
-            recent = [a for a in action_history if time.time() - a[1] < 3600]
+        if len(_state._state.action_history) > 0:
+            recent = [a for a in _state._state.action_history if time.time() - a[1] < 3600]
             log(f"[Статистика] Действий за последний час: {len(recent)}")
