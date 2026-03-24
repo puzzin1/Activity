@@ -11,10 +11,15 @@ from unittest.mock import MagicMock, Mock
 
 def pytest_configure(config):
     """
-    Автоматически мокирует pynput при запуске тестов.
+    Автоматически мокирует pynput и tkinter при запуске тестов.
 
-    Это предотвращает ошибки при импорте модулей, которые используют pynput.
+    Это предотвращает ошибки при импорте модулей, которые используют pynput и tkinter.
     """
+    # Мок для tkinter
+    tkinter_mock = MagicMock()
+    sys.modules['tkinter'] = tkinter_mock
+    sys.modules['tkinter.messagebox'] = tkinter_mock
+
     # Создаем мок для pynput.mouse
     pynput_mouse = MagicMock()
     pynput_mouse.Button = Mock()

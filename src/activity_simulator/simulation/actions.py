@@ -7,8 +7,6 @@
 
 import time
 import random
-from threading import Timer
-import tkinter as tk
 from datetime import datetime
 
 from .. import utils
@@ -155,6 +153,9 @@ def type_key_sequence(sequence: str) -> None:
 
 def show_shutdown_warning() -> bool:
     """Показывает всплывающее окно с предупреждением о выключении"""
+    import tkinter as tk
+    from threading import Timer
+
     state = get_state()
     timer = None
 
