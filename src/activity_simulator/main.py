@@ -59,6 +59,7 @@ def main() -> None:
     # Загружаем конфигурацию и инициализируем симуляцию
     cfg, sched = config.load_or_create_config()
     simulation.init_simulation(cfg, sched)
+    state = simulation.get_state()
 
     # Ротация лог-файлов
     simulation.setup_log_rotation()
