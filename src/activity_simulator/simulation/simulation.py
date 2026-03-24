@@ -33,8 +33,9 @@ def init_simulation(config: dict, schedule: dict) -> None:
     state = get_state()
     state.set_config(config)
     state.set_schedule(schedule)
-    state.last_activity_time = 0  # Инициализируем в 0, чтобы явно показать, что пользовательская активность еще не была
-    state.program_start_time = time.time()
+    current_time = time.time()
+    state.last_activity_time = current_time  # Инициализируем текущим временем, чтобы избежать огромных значений
+    state.program_start_time = current_time
 
 
 def simulate_activity() -> None:
@@ -378,10 +379,14 @@ def _handle_work_mode() -> None:
     if current_idle_threshold_local is None:
         # Убеждаемся, что первый порог не меньше времени, которое уже прошло
         new_threshold = random.randint(config['min_idle_time'], config['max_idle_time'])
-        if new_threshold < time_since_last_activity:
-            new_threshold = time_since_last_activity + 5  # Добавляем запас 5 сек
+
+        # Гарантируем, что порог не меньше MINIMUM_DELAY_AFTER_USER_ACTIVITY
+        effective_threshold = max(new_threshold, MINIMUM_DELAY_AFTER_USER_ACTIVITY)
+        if effective_threshold < time_since_last_activity:
+            effective_threshold = time_since_last_activity + 5  # Добавляем запас 5 сек
+
         with state.lock:
-            state.current_idle_threshold = new_threshold
+            state.current_idle_threshold = effective_threshold
             current_idle_threshold_local = state.current_idle_threshold
         log(f"Установлен новый порог бездействия: {current_idle_threshold_local} сек", 'DEBUG')
 
