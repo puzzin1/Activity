@@ -363,7 +363,13 @@ action_weight_ctrl_tab: 0
 activity-simulator/
 ├── 📁 src/activity_simulator/         # Основной пакет программы
 │   ├── 🎯 main.py                     # Точка входа
-│   ├── 🔄 simulation.py               # Движок симуляции
+│   ├── 📁 simulation/                 # Пакет движка симуляции
+│   │   ├── state.py                   # Состояние симуляции (SimulationState)
+│   │   ├── logger.py                  # Буферизованный логгер
+│   │   ├── time_checks.py             # Проверки времени (is_work_hours)
+│   │   ├── actions.py                 # Функции выполнения действий
+│   │   ├── modes.py                  # Обработчики режимов всплесков
+│   │   └── simulation.py             # Главный цикл симуляции
 │   ├── 👂 listeners.py                # Обработчики событий (мышь/клавиатура)
 │   ├── ⚙️ config.py                   # Управление конфигурацией
 │   └── 🛠️ utils.py                    # Вспомогательные функции
