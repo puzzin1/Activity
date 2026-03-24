@@ -81,13 +81,6 @@ def main() -> None:
 
     state.initial_mouse_position = simulation.mouse_controller.position
 
-    # Запуск потоков
-    simulate_thread = Thread(target=simulation.simulate_activity, daemon=True)
-    stats_thread = Thread(target=simulation.show_stats, daemon=True)
-
-    simulate_thread.start()
-    stats_thread.start()
-
     # === ВЫВОД ИНФОРМАЦИИ ===
     print("=" * 70)
     print("🚀 ПРОГРАММА СИМУЛЯЦИИ АКТИВНОСТИ ЗАПУЩЕНА")
@@ -289,6 +282,14 @@ def main() -> None:
         simulation.log(f"Файл лога: {state.log_file_path}")
         simulation.log(f"Начальная позиция мыши: {state.initial_mouse_position}")
         simulation.log("=" * 70)
+
+    # === ЗАПУСК ПОТОКОВ СИМУЛЯЦИИ ===
+    # Запускаем потоки только после вывода всей информации
+    simulate_thread = Thread(target=simulation.simulate_activity, daemon=True)
+    stats_thread = Thread(target=simulation.show_stats, daemon=True)
+
+    simulate_thread.start()
+    stats_thread.start()
 
     # === ОБРАБОТКА ЗАВЕРШЕНИЯ ===
     # Флаг для корректного завершения
