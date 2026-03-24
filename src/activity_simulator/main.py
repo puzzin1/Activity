@@ -56,11 +56,9 @@ def main() -> None:
     # Регистрируем обработчик очистки
     atexit.register(_cleanup_resources)
 
-    # Загружаем конфигурацию
+    # Загружаем конфигурацию и инициализируем симуляцию
     cfg, sched = config.load_or_create_config()
-    state = simulation.get_state()
-    state.set_config(cfg)
-    state.set_schedule(sched)
+    simulation.init_simulation(cfg, sched)
 
     # Ротация лог-файлов
     simulation.setup_log_rotation()
