@@ -388,8 +388,8 @@ def _handle_work_mode() -> None:
 
         # Начало симуляции
         if not state.is_simulating:
-            # mouse_controller импортирован на верхнем уровне
             with state.lock:
+                mouse_controller = get_mouse_controller()
                 state.absolute_anchor_position = mouse_controller.position
                 state.initial_mouse_position = mouse_controller.position
                 state.is_simulating = True
