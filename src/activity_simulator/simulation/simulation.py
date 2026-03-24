@@ -40,7 +40,7 @@ def init_simulation(config: dict, schedule: dict) -> None:
 
 def simulate_activity() -> None:
     """Основной цикл симуляции активности"""
-    last_burst_time = time.time()
+    last_burst_time_list = [time.time()]  # Используем список для мутации
     last_break_burst_time_list = [time.time()]  # Используем список для мутации
 
     while True:
@@ -110,7 +110,7 @@ def simulate_activity() -> None:
                 continue
 
             # Режим всплесков активности
-            _handle_afterhours_burst(last_burst_time)
+            _handle_afterhours_burst(last_burst_time_list)
             continue
 
         # === РЕЖИМ ПЕРЕРЫВА ===
@@ -184,12 +184,12 @@ def _handle_work_day_finished() -> None:
     raise ExitSimulation("Рабочий день завершен", show_warning=False)
 
 
-def _handle_afterhours_burst(last_burst_time: float) -> None:
+def _handle_afterhours_burst(last_burst_time_list: list) -> None:
     """Обрабатывает всплеск активности внерабочего режима"""
     state = get_state()
     config = state.config
 
-    time_since_burst = time.time() - last_burst_time
+    time_since_burst = time.time() - last_burst_time_list[0]
     burst_interval = random.uniform(
         config['afterhours_burst_interval_min'] * 60,
         config['afterhours_burst_interval_max'] * 60
@@ -234,7 +234,7 @@ def _handle_afterhours_burst(last_burst_time: float) -> None:
             state.is_simulating = False
 
         if not burst_interrupted:
-            last_burst_time = time.time()
+            last_burst_time_list[0] = time.time()
             log(f"{time_indicator} Всплеск активности завершен. Следующий через {burst_interval/60:.1f} мин")
 
     elif time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:

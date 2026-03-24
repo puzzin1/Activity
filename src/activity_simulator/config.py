@@ -19,8 +19,8 @@ except ImportError:
     print("   Установите PyYAML для работы с конфигурацией YAML:")
     print("   pip install pyyaml")
 
-# Путь к файлу конфигурации YAML (в корневой директории проекта)
-YAML_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.yaml')
+# Путь к файлу конфигурации YAML (в рабочей директории, а не в site-packages)
+YAML_CONFIG_PATH = os.path.join(os.getcwd(), 'config.yaml')
 
 
 # ============================================================================
