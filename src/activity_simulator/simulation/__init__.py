@@ -15,6 +15,7 @@ from .state import (
     SimulationState,
     get_state,
     MINIMUM_DELAY_AFTER_USER_ACTIVITY,
+    MAX_CONSECUTIVE_SAFE_KEYS,
     mouse_controller,
     keyboard_controller,
 )
@@ -50,6 +51,7 @@ from .modes import execute_burst_activity
 from .simulation import (
     simulate_activity,
     show_stats,
+    init_simulation,
 )
 
 __all__ = [
@@ -59,6 +61,7 @@ __all__ = [
     'SimulationState',
     'get_state',
     'MINIMUM_DELAY_AFTER_USER_ACTIVITY',
+    'MAX_CONSECUTIVE_SAFE_KEYS',
     'mouse_controller',
     'keyboard_controller',
     # Logger

@@ -68,7 +68,7 @@ class TestScheduleGeneration:
         assert schedule['is_friday'] is True
 
         # Parse times and verify earlier end
-        from activity_simulator.utils import time_str_to_minutes
+        from activity_simulator.config import time_str_to_minutes
         work_end_minutes = time_str_to_minutes(schedule['work_end'])
         friday_end_max = time_str_to_minutes(mock_config['friday_work_end_max'])
 
@@ -78,7 +78,7 @@ class TestScheduleGeneration:
     def test_lunch_placement(self, mock_config):
         """Test that lunch is placed within work hours"""
         from activity_simulator import config
-        from activity_simulator.utils import time_str_to_minutes
+        from activity_simulator.config import time_str_to_minutes
 
         schedule = config.generate_schedule(mock_config)
 
@@ -120,7 +120,7 @@ class TestScheduleGeneration:
     def test_work_hours_logic(self, mock_datetime, mock_config):
         """Test that work hours are within valid bounds"""
         from activity_simulator import config
-        from activity_simulator.utils import time_str_to_minutes
+        from activity_simulator.config import time_str_to_minutes
 
         schedule = config.generate_schedule(mock_config)
 
@@ -140,7 +140,7 @@ class TestTimeFunctions:
 
     def test_time_str_to_minutes(self):
         """Test conversion from time string to minutes"""
-        from activity_simulator.utils import time_str_to_minutes
+        from activity_simulator.config import time_str_to_minutes
 
         assert time_str_to_minutes('00:00') == 0
         assert time_str_to_minutes('00:01') == 1
@@ -151,7 +151,7 @@ class TestTimeFunctions:
 
     def test_minutes_to_time_str(self):
         """Test conversion from minutes to time string"""
-        from activity_simulator.utils import minutes_to_time_str
+        from activity_simulator.config import minutes_to_time_str
 
         assert minutes_to_time_str(0) == '00:00'
         assert minutes_to_time_str(1) == '00:01'
@@ -162,7 +162,7 @@ class TestTimeFunctions:
 
     def test_time_conversion_roundtrip(self):
         """Test that time conversions are reversible"""
-        from activity_simulator.utils import time_str_to_minutes, minutes_to_time_str
+        from activity_simulator.config import time_str_to_minutes, minutes_to_time_str
 
         original_times = ['08:30', '12:00', '18:45', '23:59', '00:00']
 

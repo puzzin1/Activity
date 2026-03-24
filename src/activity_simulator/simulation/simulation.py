@@ -8,7 +8,7 @@ import time
 import random
 from datetime import datetime
 
-from .state import get_state, MINIMUM_DELAY_AFTER_USER_ACTIVITY, mouse_controller
+from .state import get_state, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, mouse_controller
 from .logger import log
 from .time_checks import (
     is_work_hours, is_before_work, is_after_work,

@@ -82,7 +82,7 @@ class TestTimeConversions:
 
     def test_time_str_to_minutes_edge_cases(self):
         """Test edge cases for time conversion"""
-        from activity_simulator.utils import time_str_to_minutes
+        from activity_simulator.config import time_str_to_minutes
 
         # Midnight
         assert time_str_to_minutes('00:00') == 0
@@ -93,7 +93,7 @@ class TestTimeConversions:
 
     def test_minutes_to_time_str_edge_cases(self):
         """Test edge cases for minutes conversion"""
-        from activity_simulator.utils import minutes_to_time_str
+        from activity_simulator.config import minutes_to_time_str
 
         # Midnight
         assert minutes_to_time_str(0) == '00:00'

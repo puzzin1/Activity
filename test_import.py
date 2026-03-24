@@ -15,22 +15,28 @@ try:
     print("🧪 ТЕСТ ИМПОРТА ПАКЕТА activity_simulator")
     print("=" * 70)
 
-    # 1. Импорт основных модулей
-    print("1. Импорт основных модулей...")
+    # 1. Импорт основных модулей из корневого пакета
+    print("1. Импорт основных модулей из корневого пакета...")
     from activity_simulator import (
-        main,
         load_or_create_config,
         get_config_filename,
         DEFAULT_CONFIG,
+    )
+    from activity_simulator.simulation import (
         simulate_activity,
         show_stats,
+    )
+    from activity_simulator.listeners import (
         on_keyboard_event,
         on_mouse_event,
         on_mouse_click,
+    )
+    from activity_simulator.utils import (
         lock_computer,
         shutdown_computer,
-        parse_key_sequence
+        parse_key_sequence,
     )
+    from activity_simulator.main import main
     print("   ✅ Все модули успешно импортированы")
 
     # 2. Проверка конфигурации
@@ -66,6 +72,11 @@ try:
     print("\n5. Проверка функции main...")
     print(f"   ✅ main доступна: {main.__name__}")
     print(f"      Документация: {main.__doc__[:100]}...")
+
+    # 6. Проверка доступа к функциям симуляции
+    print("\n6. Проверка функций симуляции...")
+    print(f"   ✅ simulate_activity доступна: {simulate_activity.__name__}")
+    print(f"   ✅ show_stats доступна: {show_stats.__name__}")
 
     print("\n" + "=" * 70)
     print("🎉 ВСЕ ТЕСТЫ ПРОЙДЕНЫ УСПЕШНО!")
