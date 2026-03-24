@@ -1,5 +1,0 @@
-{
-    "deepseek.baseURL": "https://api.deepseek.com",
-    "deepseek.apikey": "sk-3a2e7bdf6343414f973195e6641d7d45",
-    "deepseek.model": "deepseek-reasoner"
-}
