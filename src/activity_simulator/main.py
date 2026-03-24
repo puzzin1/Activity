@@ -65,8 +65,11 @@ def main() -> None:
     # Ротация лог-файлов
     simulation.setup_log_rotation()
 
+    # Генерируем имя лог-файла
+    log_filename = datetime.now().strftime('activity_log_%Y%m%d_%H%M%S.txt')
+
     # Инициализируем буферизованный логгер
-    simulation.init_logger(state.log_file_path, state.config.get('verbose_logging', True))
+    simulation.init_logger(log_filename, state.config.get('verbose_logging', True))
 
     # Запуск слушателей
     _keyboard_listener = keyboard.Listener(on_press=listeners.on_keyboard_event)
