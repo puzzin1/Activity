@@ -78,6 +78,7 @@ class SimulationState:
         self._log_file_path: str = ""
         self._config: dict = {}
         self._schedule: dict = {}
+        self._program_start_time: float = 0.0
 
     # === Свойства для доступа к состоянию ===
 
@@ -207,6 +208,15 @@ class SimulationState:
     @last_break_burst_time.setter
     def last_break_burst_time(self, value: Optional[float]) -> None:
         self._last_break_burst_time = value
+
+    @property
+    def program_start_time(self) -> float:
+        """Время запуска программы."""
+        return self._program_start_time
+
+    @program_start_time.setter
+    def program_start_time(self, value: float) -> None:
+        self._program_start_time = value
 
     # === Методы для работы с конфигурацией и расписанием ===
 

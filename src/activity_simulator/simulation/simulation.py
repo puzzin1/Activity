@@ -34,6 +34,7 @@ def init_simulation(config: dict, schedule: dict) -> None:
     state.set_config(config)
     state.set_schedule(schedule)
     state.last_activity_time = time.time()
+    state.program_start_time = time.time()
 
 
 def simulate_activity() -> None:
@@ -44,6 +45,13 @@ def simulate_activity() -> None:
     while True:
         state = get_state()
         config = state.config
+
+        # Проверка: прошло ли 60 секунд с момента запуска программы
+        # Первое симулированное действие не ранее 60 сек после запуска
+        time_since_start = time.time() - state.program_start_time
+        if time_since_start < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+            time.sleep(1)
+            continue
 
         # Проверка активности пользователя после работы
         if state.user_activity_after_work:
