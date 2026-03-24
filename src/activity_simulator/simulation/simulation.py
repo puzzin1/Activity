@@ -33,7 +33,7 @@ def init_simulation(config: dict, schedule: dict) -> None:
     state = get_state()
     state.set_config(config)
     state.set_schedule(schedule)
-    state.last_activity_time = time.time()
+    state.last_activity_time = 0  # Инициализируем в 0, чтобы явно показать, что пользовательская активность еще не была
     state.program_start_time = time.time()
 
 
@@ -372,11 +372,14 @@ def _handle_work_mode() -> None:
     with state.lock:
         time_since_last_activity = time.time() - state.last_activity_time
         current_idle_threshold_local = state.current_idle_threshold
-        state.is_simulating = state.is_simulating
+        is_simulating = state.is_simulating
 
     # Генерация нового порога бездействия
     if current_idle_threshold_local is None:
+        # Убеждаемся, что первый порог не меньше времени, которое уже прошло
         new_threshold = random.randint(config['min_idle_time'], config['max_idle_time'])
+        if new_threshold < time_since_last_activity:
+            new_threshold = time_since_last_activity + 5  # Добавляем запас 5 сек
         with state.lock:
             state.current_idle_threshold = new_threshold
             current_idle_threshold_local = state.current_idle_threshold
@@ -384,10 +387,10 @@ def _handle_work_mode() -> None:
 
     # КРИТИЧЕСКИ ВАЖНО: Минимальная задержка MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд
     if time_since_last_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY and \
-       (state.is_simulating or time_since_last_activity >= current_idle_threshold_local):
+       (is_simulating or time_since_last_activity >= current_idle_threshold_local):
 
         # Начало симуляции
-        if not state.is_simulating:
+        if not is_simulating:
             with state.lock:
                 mouse_controller = get_mouse_controller()
                 state.absolute_anchor_position = mouse_controller.position
@@ -464,7 +467,7 @@ def _handle_work_mode() -> None:
 
     else:
         # Режим ожидания
-        if state.is_simulating:
+        if is_simulating:
             with state.lock:
                 if not state.is_simulating:
                     log("Симуляция прервана активностью пользователя.", 'INFO')
