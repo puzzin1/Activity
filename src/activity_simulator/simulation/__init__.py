@@ -16,8 +16,8 @@ from .state import (
     get_state,
     MINIMUM_DELAY_AFTER_USER_ACTIVITY,
     MAX_CONSECUTIVE_SAFE_KEYS,
-    mouse_controller,
-    keyboard_controller,
+    get_mouse_controller,
+    get_keyboard_controller,
 )
 
 from .logger import (
@@ -62,8 +62,8 @@ __all__ = [
     'get_state',
     'MINIMUM_DELAY_AFTER_USER_ACTIVITY',
     'MAX_CONSECUTIVE_SAFE_KEYS',
-    'mouse_controller',
-    'keyboard_controller',
+    'get_mouse_controller',
+    'get_keyboard_controller',
     # Logger
     'init_logger',
     'close_logger',

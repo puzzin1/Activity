@@ -1,0 +1,46 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pynput pyyaml pytest pytest-cov
+
+      - name: Run tests with dummy pynput backend
+        run: |
+          # pynput dummy backend для CI без X-сервера
+          export PYNPUT_BACKEND_KEYBOARD=dummy
+          export PYNPUT_BACKEND_MOUSE=dummy
+          python -m pytest tests/ -v --cov=activity_simulator --cov-report=term-missing
+        env:
+          PYNPUT_BACKEND_KEYBOARD: dummy
+          PYNPUT_BACKEND_MOUSE: dummy
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false

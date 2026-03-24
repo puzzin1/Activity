@@ -5,9 +5,17 @@
 
 from typing import Union
 import time
-from pynput import mouse, keyboard
-from pynput.mouse import Button
-from pynput.keyboard import Key, KeyCode
+import sys
+
+# Импортируем типы pynput только для проверки типов, не во время выполнения
+if sys.version_info >= (3, 8):
+    from typing import TYPE_CHECKING
+else:
+    TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from pynput.keyboard import Key, KeyCode
+    from pynput.mouse import Button
 
 from . import simulation
 
@@ -30,7 +38,7 @@ def _check_and_update_activity_after_work() -> bool:
 
 # === ФУНКЦИИ-СЛУШАТЕЛИ ===
 
-def on_keyboard_event(key: Union[Key, KeyCode]) -> None:
+def on_keyboard_event(key: Union['Key', 'KeyCode']) -> None:
     """Обработчик нажатий клавиатуры"""
     state = simulation.get_state()
 
@@ -76,7 +84,7 @@ def on_mouse_event(x: int, y: int) -> None:
             state.last_mouse_log_time = current_time
 
 
-def on_mouse_click(x: int, y: int, button: Button, pressed: bool) -> None:
+def on_mouse_click(x: int, y: int, button: 'Button', pressed: bool) -> None:
     """
     Обработчик кликов мыши/тачпада.
     Автоматически отслеживает как клики мыши, так и тапы тачпада.

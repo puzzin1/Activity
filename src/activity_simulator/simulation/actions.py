@@ -12,7 +12,7 @@ import tkinter as tk
 from datetime import datetime
 
 from .. import utils
-from .state import get_state, mouse_controller, keyboard_controller, MINIMUM_DELAY_AFTER_USER_ACTIVITY
+from .state import get_state, get_mouse_controller, get_keyboard_controller, MINIMUM_DELAY_AFTER_USER_ACTIVITY
 from .logger import log
 from .time_checks import is_before_work
 
@@ -34,6 +34,7 @@ def get_consecutive_safe_key_count() -> int:
 
 def move_mouse_naturally(target_x: int, target_y: int) -> None:
     """Плавное перемещение мыши к целевой позиции"""
+    mouse_controller = get_mouse_controller()
     start_pos = mouse_controller.position
     dx = target_x - start_pos[0]
     dy = target_y - start_pos[1]
@@ -70,7 +71,7 @@ def move_mouse_naturally(target_x: int, target_y: int) -> None:
 
         new_x = start_pos[0] + (dx * t)
         new_y = start_pos[1] + (dy * t)
-        mouse_controller.position = (new_x, new_y)
+        get_mouse_controller().position = (new_x, new_y)
 
         sleep_time = config['smooth_move_duration'] / steps
         if config['natural_behavior'] and random.random() < 0.1:
@@ -78,7 +79,7 @@ def move_mouse_naturally(target_x: int, target_y: int) -> None:
 
         time.sleep(sleep_time)
 
-    mouse_controller.position = (target_x, target_y)
+    get_mouse_controller().position = (target_x, target_y)
 
     with state.lock:
         state.is_performing_action = False
@@ -109,6 +110,7 @@ def type_key_sequence(sequence: str) -> None:
     try:
         parsed = utils.parse_key_sequence(sequence)
         from pynput.keyboard import Key
+        keyboard_controller = get_keyboard_controller()
 
         for element in parsed:
             # Проверяем, является ли элемент специальной клавишей
@@ -251,7 +253,7 @@ def random_mouse_move() -> None:
     move_mouse_naturally(target_x, target_y)
     state.action_history.append(('mouse_move', time.time()))
 
-    state.initial_mouse_position = mouse_controller.position
+    state.initial_mouse_position = get_mouse_controller().position
 
 
 def random_arrow_press() -> None:
@@ -260,6 +262,7 @@ def random_arrow_press() -> None:
 
     state = get_state()
     config = state.config
+    keyboard_controller = get_keyboard_controller()
 
     if config['natural_behavior']:
         # Больший вес для up/down (вертикальная прокрутка популярнее)
@@ -318,7 +321,7 @@ def random_mouse_click() -> None:
     with state.lock:
         state.is_performing_action = True
 
-    mouse_controller.click(Button.left, 1)
+    get_mouse_controller().click(Button.left, 1)
 
     with state.lock:
         state.is_performing_action = False
@@ -338,6 +341,7 @@ def safe_key_press() -> None:
     with state.lock:
         state.is_performing_action = True
 
+    keyboard_controller = get_keyboard_controller()
     keyboard_controller.press(Key.shift)
     time.sleep(0.05)
     keyboard_controller.release(Key.shift)
@@ -358,6 +362,7 @@ def control_tab_press() -> None:
         state.is_performing_action = True
         action_start_time = state.last_activity_time
 
+    keyboard_controller = get_keyboard_controller()
     keyboard_controller.press(Key.ctrl_l)
     time.sleep(random.uniform(0.05, 0.15))
 

@@ -8,7 +8,7 @@
 import time
 from typing import Optional, Callable, Tuple
 
-from .state import get_state, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, mouse_controller
+from .state import get_state, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller
 from .logger import log
 from .actions import get_consecutive_safe_key_count, random_mouse_move, safe_key_press
 
@@ -62,6 +62,7 @@ def execute_burst_activity(
         burst_end_time = time.time() + burst_duration
 
         with state.lock:
+            mouse_controller = get_mouse_controller()
             state.absolute_anchor_position = mouse_controller.position
             state.initial_mouse_position = mouse_controller.position
             state.is_simulating = True

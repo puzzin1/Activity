@@ -79,7 +79,7 @@ def main() -> None:
     _keyboard_listener.start()
     _mouse_listener.start()
 
-    state.initial_mouse_position = simulation.mouse_controller.position
+    state.initial_mouse_position = simulation.get_mouse_controller().position
 
     # === ВЫВОД ИНФОРМАЦИИ ===
     print("=" * 70)

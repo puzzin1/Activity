@@ -8,7 +8,7 @@ import time
 import random
 from datetime import datetime
 
-from .state import get_state, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, mouse_controller
+from .state import get_state, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller
 from .logger import log
 from .time_checks import (
     is_work_hours, is_before_work, is_after_work,
@@ -210,7 +210,7 @@ def _handle_afterhours_burst(last_burst_time: float) -> None:
         burst_end_time = time.time() + burst_duration
 
         with state.lock:
-            # mouse_controller импортирован на верхнем уровне
+            mouse_controller = get_mouse_controller()
             state.absolute_anchor_position = mouse_controller.position
             state.initial_mouse_position = mouse_controller.position
             state.is_simulating = True
@@ -272,7 +272,7 @@ def _handle_break_burst(last_break_burst_time_list: list) -> None:
         burst_end_time = time.time() + burst_duration
 
         with state.lock:
-            # mouse_controller импортирован на верхнем уровне
+            mouse_controller = get_mouse_controller()
             state.absolute_anchor_position = mouse_controller.position
             state.initial_mouse_position = mouse_controller.position
             state.is_simulating = True

@@ -7,8 +7,6 @@
 
 from typing import Optional, Tuple
 from threading import Lock
-from pynput.mouse import Controller
-from pynput.keyboard import Controller as KeyboardController
 from collections import deque
 
 
@@ -40,9 +38,27 @@ class ExitSimulation(Exception):
         self.show_warning = show_warning
 
 
-# Контроллеры ввода (глобальные, так как используются только для чтения)
-mouse_controller: Controller = Controller()
-keyboard_controller: KeyboardController = KeyboardController()
+# Контроллеры ввода - ленивая инициализация для избежания импорта при загрузке модуля
+_mouse_controller = None
+_keyboard_controller = None
+
+
+def get_mouse_controller():
+    """Возвращает контроллер мыши, инициализируя его при первом вызове."""
+    global _mouse_controller
+    if _mouse_controller is None:
+        from pynput.mouse import Controller
+        _mouse_controller = Controller()
+    return _mouse_controller
+
+
+def get_keyboard_controller():
+    """Возвращает контроллер клавиатуры, инициализируя его при первом вызове."""
+    global _keyboard_controller
+    if _keyboard_controller is None:
+        from pynput.keyboard import Controller as KeyboardController
+        _keyboard_controller = KeyboardController()
+    return _keyboard_controller
 
 
 # === КЛАСС ИНКАПСУЛЯЦИИ ГЛОБАЛЬНОГО СОСТОЯНИЯ ===
@@ -55,9 +71,9 @@ class SimulationState:
     методы с блокировкой, вместо прямого обращения к глобальным переменным.
     """
 
-    # Контроллеры ввода (ссылки на глобальные)
-    mouse_controller: Controller
-    keyboard_controller: KeyboardController
+    # Контроллеры ввода (ссылки на глобальные) - строковые аннотации для избежания импорта при загрузке
+    mouse_controller: 'Controller'
+    keyboard_controller: 'KeyboardController'
 
     def __init__(self) -> None:
         """Инициализирует состояние симуляции с начальными значениями."""
