@@ -5,6 +5,7 @@
 внерабочее время, перерывы.
 """
 
+import random
 import time
 from typing import Optional, Callable, Tuple
 
