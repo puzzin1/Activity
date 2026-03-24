@@ -9,7 +9,7 @@ import random
 import time
 from typing import Optional, Callable, Tuple
 
-from .state import get_state, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller
+from .state import get_state, SimulationState, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller
 from .logger import log
 from .actions import get_consecutive_safe_key_count, random_mouse_move, safe_key_press
 
@@ -23,6 +23,7 @@ def execute_burst_activity(
     mode_name: str,
     time_indicator: str = "",
     check_break_ended: Optional[Callable[[], Tuple[bool, Optional[str]]]] = None,
+    state: SimulationState = None,
 ) -> str:
     """
     Универсальная функция выполнения всплеска активности.
@@ -38,11 +39,13 @@ def execute_burst_activity(
         mode_name: str - название режима для логов (например, "Внерабочий", "Перерыв")
         time_indicator: str - emoji индикатор времени (например, "🌅", "🌙")
         check_break_ended: callable или None - функция для проверки окончания перерыва
+        state: Экземпляр состояния симуляции (если None, используется глобальный)
 
     Returns:
         str: 'completed', 'interrupted', 'ended', или 'waiting'
     """
-    state = get_state()
+    if state is None:
+        state = get_state()
     config = state.config
     current_last_burst = last_burst_time_ref[0]
     time_since_burst = time.time() - current_last_burst

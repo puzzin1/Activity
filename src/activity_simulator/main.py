@@ -58,17 +58,16 @@ def main() -> None:
 
     # Загружаем конфигурацию и инициализируем симуляцию
     cfg, sched = config.load_or_create_config()
-    simulation.init_simulation(cfg, sched)
-    state = simulation.get_state()
+    state = simulation.init_simulation(cfg, sched)
 
     # Ротация лог-файлов
-    simulation.setup_log_rotation()
+    simulation.setup_log_rotation(state)
 
     # Генерируем имя лог-файла
     log_filename = datetime.now().strftime('activity_log_%Y%m%d_%H%M%S.txt')
 
     # Инициализируем логгер
-    simulation.init_logger(log_filename, enabled=True, verbose=state.config.get('verbose_logging', True))
+    simulation.init_logger(log_filename, enabled=True, verbose=state.config.get('verbose_logging', True), state=state)
 
     # Запуск слушателей
     _keyboard_listener = keyboard.Listener(on_press=listeners.on_keyboard_event)
@@ -164,15 +163,15 @@ def main() -> None:
     print("=" * 70)
 
     # Проверяем текущий статус
-    if simulation.is_work_hours():
-        on_break, break_type = simulation.is_break_time()
+    if simulation.is_work_hours(state):
+        on_break, break_type = simulation.is_break_time(state)
         if on_break:
             print(f"☕ Текущий статус: Перерыв ({break_type})")
         else:
             print(f"💼 Текущий статус: Рабочее время - активность включена")
     else:
-        if simulation.should_simulate_afterhours():
-            time_indicator = "🌅 Перед работой" if simulation.is_before_work() else "🌙 После работы"
+        if simulation.should_simulate_afterhours(state):
+            time_indicator = "🌅 Перед работой" if simulation.is_before_work(state) else "🌙 После работы"
             print(f"{time_indicator} - режим всплесков активности")
         else:
             print(f"🌙 Внерабочее время - активность отключена")
@@ -183,58 +182,58 @@ def main() -> None:
 
     # === СОХРАНЕНИЕ ИНФОРМАЦИОННОЙ ЧАСТИ В ЛОГ ===
     if state.config['verbose_logging']:
-        simulation.log("=" * 70)
-        simulation.log("ПРОГРАММА СИМУЛЯЦИИ АКТИВНОСТИ ЗАПУЩЕНА")
-        simulation.log("=" * 70)
-        simulation.log(f"Конфигурация: {config.get_config_filename()}")
-        simulation.log(f"Отслеживание: Мышь + Тачпад + Клавиатура")
-        simulation.log("")
+        simulation.log("=" * 70, state=state)
+        simulation.log("ПРОГРАММА СИМУЛЯЦИИ АКТИВНОСТИ ЗАПУЩЕНА", state=state)
+        simulation.log("=" * 70, state=state)
+        simulation.log(f"Конфигурация: {config.get_config_filename()}", state=state)
+        simulation.log(f"Отслеживание: Мышь + Тачпад + Клавиатура", state=state)
+        simulation.log("", state=state)
 
         day_log_indicator = ""
         if state.schedule.get('is_friday', False):
             day_log_indicator = " (ПЯТНИЦА - короткий день)"
 
-        simulation.log(f"РАСПИСАНИЕ НА СЕГОДНЯ:{day_log_indicator}")
-        simulation.log(f"  • Рабочее время: {state.schedule['work_start']} - {state.schedule['work_end']}")
+        simulation.log(f"РАСПИСАНИЕ НА СЕГОДНЯ:{day_log_indicator}", state=state)
+        simulation.log(f"  • Рабочее время: {state.schedule['work_start']} - {state.schedule['work_end']}", state=state)
         simulation.log(f"  • Обед: {state.schedule['lunch_start']} - {state.schedule['lunch_end']} " +
-                      f"({utils.time_str_to_minutes(state.schedule['lunch_end']) - utils.time_str_to_minutes(state.schedule['lunch_start'])} мин)")
+                      f"({utils.time_str_to_minutes(state.schedule['lunch_end']) - utils.time_str_to_minutes(state.schedule['lunch_start'])} мин)", state=state)
 
         if state.schedule['breaks']:
-            simulation.log(f"  • Перерывы:")
+            simulation.log(f"  • Перерывы:", state=state)
             for i, brk in enumerate(state.schedule['breaks'], 1):
-                simulation.log(f"    {i}. {brk['start']} - {brk['end']} ({brk['duration']} мин)")
+                simulation.log(f"    {i}. {brk['start']} - {brk['end']} ({brk['duration']} мин)", state=state)
         else:
-            simulation.log(f"  • Перерывы: нет")
+            simulation.log(f"  • Перерывы: нет", state=state)
 
-        simulation.log("")
-        simulation.log("ОСНОВНЫЕ ПАРАМЕТРЫ:")
-        simulation.log(f"  • Порог бездействия: {state.config['min_idle_time']}-{state.config['max_idle_time']} сек")
-        simulation.log(f"  • Интервал между действиями: {state.config['min_action_interval']}-{state.config['max_action_interval']} сек")
-        simulation.log(f"  • Серия нажатий стрелок: {state.config['min_key_presses']}-{state.config['max_key_presses']} раз")
-        simulation.log(f"  • Макс. диапазон мыши: {state.config['max_mouse_range']} пикс")
+        simulation.log("", state=state)
+        simulation.log("ОСНОВНЫЕ ПАРАМЕТРЫ:", state=state)
+        simulation.log(f"  • Порог бездействия: {state.config['min_idle_time']}-{state.config['max_idle_time']} сек", state=state)
+        simulation.log(f"  • Интервал между действиями: {state.config['min_action_interval']}-{state.config['max_action_interval']} сек", state=state)
+        simulation.log(f"  • Серия нажатий стрелок: {state.config['min_key_presses']}-{state.config['max_key_presses']} раз", state=state)
+        simulation.log(f"  • Макс. диапазон мыши: {state.config['max_mouse_range']} пикс", state=state)
 
-        simulation.log("")
-        simulation.log("ТИПЫ ДЕЙСТВИЙ:")
-        simulation.log(f"  • Движение мыши: {'✓' if state.config['use_mouse_move'] else '✗'} (вес: {state.config['action_weight_mouse_move']})")
-        simulation.log(f"  • Стрелки клавиатуры: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_keyboard']})")
-        simulation.log(f"  • Ctrl+Tab: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_ctrl_tab']})")
-        simulation.log(f"  • Клики мыши: {'✓' if state.config['use_mouse_click'] else '✗'} (вес: {state.config['action_weight_mouse_click']})")
-        simulation.log(f"  • Shift (безопасный): {'✓' if state.config['natural_behavior'] else '✗'} (вес: {state.config['action_weight_safe_key']})")
-        simulation.log(f"  • Естественное поведение: {'✓' if state.config['natural_behavior'] else '✗'}")
+        simulation.log("", state=state)
+        simulation.log("ТИПЫ ДЕЙСТВИЙ:", state=state)
+        simulation.log(f"  • Движение мыши: {'✓' if state.config['use_mouse_move'] else '✗'} (вес: {state.config['action_weight_mouse_move']})", state=state)
+        simulation.log(f"  • Стрелки клавиатуры: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_keyboard']})", state=state)
+        simulation.log(f"  • Ctrl+Tab: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_ctrl_tab']})", state=state)
+        simulation.log(f"  • Клики мыши: {'✓' if state.config['use_mouse_click'] else '✗'} (вес: {state.config['action_weight_mouse_click']})", state=state)
+        simulation.log(f"  • Shift (безопасный): {'✓' if state.config['natural_behavior'] else '✗'} (вес: {state.config['action_weight_safe_key']})", state=state)
+        simulation.log(f"  • Естественное поведение: {'✓' if state.config['natural_behavior'] else '✗'}", state=state)
 
-        simulation.log("")
+        simulation.log("", state=state)
         afterhours_mode_names = {
             'disabled': '🚫 Отключен',
             'before_only': '🌅 Только до работы',
             'before_and_after': '🌅🌙 До и после работы'
         }
-        simulation.log(f"ВНЕРАБОЧИЙ РЕЖИМ: {afterhours_mode_names.get(state.config['afterhours_mode'], state.config['afterhours_mode'])}")
+        simulation.log(f"ВНЕРАБОЧИЙ РЕЖИМ: {afterhours_mode_names.get(state.config['afterhours_mode'], state.config['afterhours_mode'])}", state=state)
         if state.config['afterhours_mode'] != 'disabled':
-            simulation.log(f"  • Всплески активности: {state.config['afterhours_burst_duration_min']}-{state.config['afterhours_burst_duration_max']} сек")
-            simulation.log(f"  • Интервал между всплесками: {state.config['afterhours_burst_interval_min']}-{state.config['afterhours_burst_interval_max']} мин")
+            simulation.log(f"  • Всплески активности: {state.config['afterhours_burst_duration_min']}-{state.config['afterhours_burst_duration_max']} сек", state=state)
+            simulation.log(f"  • Интервал между всплесками: {state.config['afterhours_burst_interval_min']}-{state.config['afterhours_burst_interval_max']} мин", state=state)
 
-        simulation.log("")
-        simulation.log("ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:")
+        simulation.log("", state=state)
+        simulation.log("ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:", state=state)
         if state.config.get('after_lunch_action', False):
             sequence_display = state.config.get('after_lunch_sequence', '')
             masked_sequence = ""
@@ -252,35 +251,35 @@ def main() -> None:
                     masked_sequence += '*'
                     i += 1
 
-            simulation.log(f"  • Ввод последовательности: ✓ ({masked_sequence})")
-            simulation.log(f"  • Задержка после обеда: {state.config.get('after_lunch_delay', 5)} сек")
+            simulation.log(f"  • Ввод последовательности: ✓ ({masked_sequence})", state=state)
+            simulation.log(f"  • Задержка после обеда: {state.config.get('after_lunch_delay', 5)} сек", state=state)
         else:
-            simulation.log(f"  • Ввод последовательности: ✗ (отключено)")
+            simulation.log(f"  • Ввод последовательности: ✗ (отключено)", state=state)
 
-        simulation.log("")
-        simulation.log("ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ (Ctrl+C):")
-        simulation.log(f"  • Действие: Просто завершение программы")
+        simulation.log("", state=state)
+        simulation.log("ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ (Ctrl+C):", state=state)
+        simulation.log(f"  • Действие: Просто завершение программы", state=state)
 
-        simulation.log("=" * 70)
+        simulation.log("=" * 70, state=state)
 
         # Текущий статус
-        if simulation.is_work_hours():
-            on_break, break_type = simulation.is_break_time()
+        if simulation.is_work_hours(state):
+            on_break, break_type = simulation.is_break_time(state)
             if on_break:
-                simulation.log(f"Текущий статус: Перерыв ({break_type})")
+                simulation.log(f"Текущий статус: Перерыв ({break_type})", state=state)
             else:
-                simulation.log(f"Текущий статус: Рабочее время - активность включена")
+                simulation.log(f"Текущий статус: Рабочее время - активность включена", state=state)
         else:
-            if simulation.should_simulate_afterhours():
-                time_indicator = "Перед работой" if simulation.is_before_work() else "После работы"
-                simulation.log(f"Текущий статус: {time_indicator} - режим всплесков активности")
+            if simulation.should_simulate_afterhours(state):
+                time_indicator = "Перед работой" if simulation.is_before_work(state) else "После работы"
+                simulation.log(f"Текущий статус: {time_indicator} - режим всплесков активности", state=state)
             else:
-                simulation.log(f"Текущий статус: Внерабочее время - активность отключена")
+                simulation.log(f"Текущий статус: Внерабочее время - активность отключена", state=state)
 
-        simulation.log("")
-        simulation.log(f"Файл лога: {state.log_file_path}")
-        simulation.log(f"Начальная позиция мыши: {state.initial_mouse_position}")
-        simulation.log("=" * 70)
+        simulation.log("", state=state)
+        simulation.log(f"Файл лога: {state.log_file_path}", state=state)
+        simulation.log(f"Начальная позиция мыши: {state.initial_mouse_position}", state=state)
+        simulation.log("=" * 70, state=state)
 
     # === ЗАПУСК ПОТОКОВ СИМУЛЯЦИИ ===
     # Запускаем потоки только после вывода всей информации
@@ -321,10 +320,10 @@ def main() -> None:
 
     if state.config['verbose_logging']:
         print(f"📄 Лог сохранён в файл: {state.log_file_path}")
-        simulation.log("")
-        simulation.log("=" * 70)
-        simulation.log(f"Программа завершена. Всего действий: {len(state.action_history)}")
-        simulation.log("=" * 70)
+        simulation.log("", state=state)
+        simulation.log("=" * 70, state=state)
+        simulation.log(f"Программа завершена. Всего действий: {len(state.action_history)}", state=state)
+        simulation.log("=" * 70, state=state)
 
     # При нажатии Ctrl-C программа просто завершается
     print("👋 Программа завершена. До свидания!")

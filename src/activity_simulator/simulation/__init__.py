@@ -13,6 +13,7 @@
 from .state import (
     ExitSimulation,
     SimulationState,
+    create_state,
     get_state,
     MINIMUM_DELAY_AFTER_USER_ACTIVITY,
     MAX_CONSECUTIVE_SAFE_KEYS,
@@ -59,6 +60,7 @@ __all__ = [
     'ExitSimulation',
     # State
     'SimulationState',
+    'create_state',
     'get_state',
     'MINIMUM_DELAY_AFTER_USER_ACTIVITY',
     'MAX_CONSECUTIVE_SAFE_KEYS',

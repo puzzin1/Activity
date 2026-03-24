@@ -9,6 +9,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 import pytest
 
+from activity_simulator.simulation.state import create_state
+
 
 class TestOnKeyboardEvent:
     """Tests for on_keyboard_event()"""
@@ -18,8 +20,7 @@ class TestOnKeyboardEvent:
         """Test basic keyboard event updates state"""
         from activity_simulator.listeners import on_keyboard_event
 
-        state = Mock()
-        state.lock = MagicMock()
+        state = create_state()
         state.is_performing_action = False
         state.last_activity_time = 0
         state.current_idle_threshold = 100
@@ -30,7 +31,7 @@ class TestOnKeyboardEvent:
         mock_sim.is_work_hours.return_value = True
         mock_sim.log = Mock()
 
-        on_keyboard_event(Mock())
+        on_keyboard_event(Mock(), state)
 
         # Check that state was updated
         assert state.last_activity_time > 0
@@ -43,8 +44,7 @@ class TestOnKeyboardEvent:
         """Test keyboard event during simulation is ignored"""
         from activity_simulator.listeners import on_keyboard_event
 
-        state = Mock()
-        state.lock = MagicMock()
+        state = create_state()
         state.is_performing_action = True  # Simulation in progress
         state.last_activity_time = time.time() - 30
         mock_sim.get_state.return_value = state
@@ -52,7 +52,7 @@ class TestOnKeyboardEvent:
 
         old_time = state.last_activity_time
 
-        on_keyboard_event(Mock())
+        on_keyboard_event(Mock(), state)
 
         # Time should not be updated (simulated event ignored)
         assert state.last_activity_time == old_time
@@ -63,8 +63,7 @@ class TestOnKeyboardEvent:
         """Test keyboard event after work hours sets flag"""
         from activity_simulator.listeners import on_keyboard_event
 
-        state = Mock()
-        state.lock = MagicMock()
+        state = create_state()
         state.is_performing_action = False
         state.user_activity_after_work = False
         mock_sim.get_state.return_value = state
@@ -72,7 +71,7 @@ class TestOnKeyboardEvent:
         mock_sim.is_work_hours.return_value = False
         mock_sim.log = Mock()
 
-        on_keyboard_event(Mock())
+        on_keyboard_event(Mock(), state)
 
         # Check that after work flag was set
         assert state.user_activity_after_work is True
@@ -86,8 +85,7 @@ class TestOnMouseEvent:
         """Test basic mouse event updates state"""
         from activity_simulator.listeners import on_mouse_event
 
-        state = Mock()
-        state.lock = MagicMock()
+        state = create_state()
         state.is_performing_action = False
         state.last_activity_time = 0
         state.initial_mouse_position = (0, 0)
@@ -100,7 +98,7 @@ class TestOnMouseEvent:
         mock_sim.is_work_hours.return_value = True
         mock_sim.log = Mock()
 
-        on_mouse_event(100, 200)
+        on_mouse_event(100, 200, state)
 
         # Check that state was updated
         assert state.last_activity_time > 0
@@ -114,8 +112,7 @@ class TestOnMouseEvent:
         """Test mouse event during simulation is ignored"""
         from activity_simulator.listeners import on_mouse_event
 
-        state = Mock()
-        state.lock = MagicMock()
+        state = create_state()
         state.is_performing_action = True  # Simulation in progress
         state.last_activity_time = time.time() - 30
         mock_sim.get_state.return_value = state
@@ -124,7 +121,7 @@ class TestOnMouseEvent:
         old_time = state.last_activity_time
         old_pos = state.initial_mouse_position
 
-        on_mouse_event(500, 600)
+        on_mouse_event(500, 600, state)
 
         # State should not be updated
         assert state.last_activity_time == old_time
@@ -135,8 +132,7 @@ class TestOnMouseEvent:
         """Test mouse event after work hours sets flag"""
         from activity_simulator.listeners import on_mouse_event
 
-        state = Mock()
-        state.lock = MagicMock()
+        state = create_state()
         state.is_performing_action = False
         state.user_activity_after_work = False
         mock_sim.get_state.return_value = state
@@ -144,7 +140,7 @@ class TestOnMouseEvent:
         mock_sim.is_work_hours.return_value = False
         mock_sim.log = Mock()
 
-        on_mouse_event(100, 200)
+        on_mouse_event(100, 200, state)
 
         # Check that after work flag was set
         assert state.user_activity_after_work is True
@@ -155,8 +151,7 @@ class TestOnMouseEvent:
         """Test mouse event logs only once per second"""
         from activity_simulator.listeners import on_mouse_event
 
-        state = Mock()
-        state.lock = MagicMock()
+        state = create_state()
         state.is_performing_action = False
         state.last_mouse_log_time = 0
         mock_sim.get_state.return_value = state
@@ -168,8 +163,8 @@ class TestOnMouseEvent:
         mock_time.time.return_value = 1.0
 
         # Multiple mouse events within 1 second
-        on_mouse_event(100, 200)
-        on_mouse_event(150, 250)
+        on_mouse_event(100, 200, state)
+        on_mouse_event(150, 250, state)
 
         # Log should only be called once (throttled)
         assert mock_sim.log.call_count == 1
@@ -183,8 +178,7 @@ class TestOnMouseClick:
         """Test basic mouse click updates state"""
         from activity_simulator.listeners import on_mouse_click
 
-        state = Mock()
-        state.lock = MagicMock()
+        state = create_state()
         state.is_performing_action = False
         state.last_activity_time = 0
         state.current_idle_threshold = 100
@@ -196,7 +190,7 @@ class TestOnMouseClick:
         mock_sim.log = Mock()
 
         button = Mock()
-        on_mouse_click(100, 200, button, pressed=True)
+        on_mouse_click(100, 200, button, pressed=True, state=state)
 
         # Check that state was updated
         assert state.last_activity_time > 0
@@ -209,8 +203,7 @@ class TestOnMouseClick:
         """Test mouse click during simulation is ignored"""
         from activity_simulator.listeners import on_mouse_click
 
-        state = Mock()
-        state.lock = MagicMock()
+        state = create_state()
         state.is_performing_action = True  # Simulation in progress
         state.last_activity_time = time.time() - 30
         mock_sim.get_state.return_value = state
@@ -219,7 +212,7 @@ class TestOnMouseClick:
         old_time = state.last_activity_time
         button = Mock()
 
-        on_mouse_click(500, 600, button, pressed=True)
+        on_mouse_click(500, 600, button, pressed=True, state=state)
 
         # State should not be updated
         assert state.last_activity_time == old_time
@@ -230,15 +223,14 @@ class TestOnMouseClick:
         """Test mouse click release is ignored"""
         from activity_simulator.listeners import on_mouse_click
 
-        state = Mock()
-        state.lock = MagicMock()
+        state = create_state()
         state.is_performing_action = False
         state.last_activity_time = 0
         mock_sim.get_state.return_value = state
         mock_sim.log = Mock()
 
         button = Mock()
-        on_mouse_click(100, 200, button, pressed=False)
+        on_mouse_click(100, 200, button, pressed=False, state=state)
 
         # State should not be updated on release
         assert state.last_activity_time == 0
@@ -249,8 +241,7 @@ class TestOnMouseClick:
         """Test mouse click after work hours sets flag"""
         from activity_simulator.listeners import on_mouse_click
 
-        state = Mock()
-        state.lock = MagicMock()
+        state = create_state()
         state.is_performing_action = False
         state.user_activity_after_work = False
         mock_sim.get_state.return_value = state
@@ -259,7 +250,7 @@ class TestOnMouseClick:
         mock_sim.log = Mock()
 
         button = Mock()
-        on_mouse_click(100, 200, button, pressed=True)
+        on_mouse_click(100, 200, button, pressed=True, state=state)
 
         # Check that after work flag was set
         assert state.user_activity_after_work is True
@@ -273,15 +264,15 @@ class TestCheckAndUpdateActivityAfterWork:
         """Test returns False during work hours"""
         from activity_simulator.listeners import _check_and_update_activity_after_work
 
-        state = Mock()
-        state.config = {'exit_on_activity_after_work': True}
+        state = create_state()
+        state.set_config({'exit_on_activity_after_work': True})
         state.user_activity_after_work = False
         mock_sim.get_state.return_value = state
         mock_sim.is_after_work.return_value = False
         mock_sim.is_work_hours.return_value = True
         mock_sim.log = Mock()
 
-        result = _check_and_update_activity_after_work()
+        result = _check_and_update_activity_after_work(state)
 
         # Should return False (not after work)
         assert result is False
@@ -292,15 +283,15 @@ class TestCheckAndUpdateActivityAfterWork:
         """Test sets flag and returns True after work with activity"""
         from activity_simulator.listeners import _check_and_update_activity_after_work
 
-        state = Mock()
-        state.config = {'exit_on_activity_after_work': True}
+        state = create_state()
+        state.set_config({'exit_on_activity_after_work': True})
         state.user_activity_after_work = False
         mock_sim.get_state.return_value = state
         mock_sim.is_after_work.return_value = True
         mock_sim.is_work_hours.return_value = False
         mock_sim.log = Mock()
 
-        result = _check_and_update_activity_after_work()
+        result = _check_and_update_activity_after_work(state)
 
         # Should return True and set flag
         assert result is True
@@ -312,15 +303,15 @@ class TestCheckAndUpdateActivityAfterWork:
         """Test flag already set remains set"""
         from activity_simulator.listeners import _check_and_update_activity_after_work
 
-        state = Mock()
-        state.config = {'exit_on_activity_after_work': True}
+        state = create_state()
+        state.set_config({'exit_on_activity_after_work': True})
         state.user_activity_after_work = True  # Already set
         mock_sim.get_state.return_value = state
         mock_sim.is_after_work.return_value = True
         mock_sim.is_work_hours.return_value = False
         mock_sim.log = Mock()
 
-        result = _check_and_update_activity_after_work()
+        result = _check_and_update_activity_after_work(state)
 
         # Should return True but not log again
         assert result is True
@@ -332,15 +323,15 @@ class TestCheckAndUpdateActivityAfterWork:
         """Test returns False when exit_on_activity_after_work is False"""
         from activity_simulator.listeners import _check_and_update_activity_after_work
 
-        state = Mock()
-        state.config = {'exit_on_activity_after_work': False}
+        state = create_state()
+        state.set_config({'exit_on_activity_after_work': False})
         state.user_activity_after_work = False
         mock_sim.get_state.return_value = state
         mock_sim.is_after_work.return_value = True
         mock_sim.is_work_hours.return_value = False
         mock_sim.log = Mock()
 
-        result = _check_and_update_activity_after_work()
+        result = _check_and_update_activity_after_work(state)
 
         # Should return False (exit disabled)
         assert result is False

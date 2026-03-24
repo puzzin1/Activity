@@ -9,7 +9,7 @@ import logging
 import logging.handlers
 import os
 from typing import Optional
-from .state import get_state
+from .state import get_state, SimulationState
 
 # Глобальный логгер (инициализируется в main.py)
 _logger: Optional[logging.Logger] = None
@@ -20,7 +20,7 @@ def get_logger() -> Optional[logging.Logger]:
     return _logger
 
 
-def init_logger(file_path: str, enabled: bool = True, verbose: bool = True) -> None:
+def init_logger(file_path: str, enabled: bool = True, verbose: bool = True, state=None) -> None:
     """
     Инициализирует глобальный логгер с FileHandler и StreamHandler.
 
@@ -28,6 +28,7 @@ def init_logger(file_path: str, enabled: bool = True, verbose: bool = True) -> N
         file_path: Путь к файлу лога
         enabled: Включен ли логгер
         verbose: Включено ли подробное логирование
+        state: Экземпляр состояния симуляции (если None, используется глобальный)
     """
     global _logger
 
@@ -78,13 +79,14 @@ def close_logger() -> None:
         _logger = None
 
 
-def log(message: str, level: str = 'INFO') -> None:
+def log(message: str, level: str = 'INFO', state: SimulationState = None) -> None:
     """
     Функция для логирования.
 
     Args:
         message: Сообщение для логирования
         level: Уровень логирования (INFO, WARNING, ERROR, DEBUG)
+        state: Экземпляр состояния симуляции (если None, используется глобальный)
     """
     if _logger is None:
         # Fallback: прямой вывод если логгер не инициализирован
@@ -101,15 +103,19 @@ def log(message: str, level: str = 'INFO') -> None:
     _logger.log(log_level, message)
 
 
-def setup_log_rotation() -> None:
+def setup_log_rotation(state: SimulationState = None) -> None:
     """
     Настраивает RotatingFileHandler для ротации лог-файлов.
 
     Ротация происходит на основе количества файлов (max_files) из конфигурации.
+
+    Args:
+        state: Экземпляр состояния симуляции (если None, используется глобальный)
     """
     from ..config import rotate_files
 
-    state = get_state()
+    if state is None:
+        state = get_state()
     config = state.config
     if not config or _logger is None:
         return

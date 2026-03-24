@@ -8,37 +8,77 @@
 from typing import Tuple, Optional
 
 from .. import utils
-from .state import get_state
+from .state import get_state, SimulationState
 
 
-def is_work_hours() -> bool:
-    """Проверяет, находимся ли мы в рабочее время"""
-    schedule = get_state().schedule
+def is_work_hours(state: SimulationState = None) -> bool:
+    """
+    Проверяет, находимся ли мы в рабочее время.
+
+    Args:
+        state: Экземпляр состояния симуляции (если None, используется глобальный)
+
+    Returns:
+        True если сейчас рабочее время
+    """
+    if state is None:
+        state = get_state()
+    schedule = state.schedule
     current = utils.get_current_time_minutes()
     work_start = utils.time_str_to_minutes(schedule['work_start'])
     work_end = utils.time_str_to_minutes(schedule['work_end'])
     return work_start <= current <= work_end
 
 
-def is_before_work() -> bool:
-    """Проверяет, находимся ли мы ДО начала рабочего времени"""
-    schedule = get_state().schedule
+def is_before_work(state: SimulationState = None) -> bool:
+    """
+    Проверяет, находимся ли мы ДО начала рабочего времени.
+
+    Args:
+        state: Экземпляр состояния симуляции (если None, используется глобальный)
+
+    Returns:
+        True если сейчас до начала рабочего времени
+    """
+    if state is None:
+        state = get_state()
+    schedule = state.schedule
     current = utils.get_current_time_minutes()
     work_start = utils.time_str_to_minutes(schedule['work_start'])
     return current < work_start
 
 
-def is_after_work() -> bool:
-    """Проверяем, находимся ли мы ПОСЛЕ окончания рабочего времени"""
-    schedule = get_state().schedule
+def is_after_work(state: SimulationState = None) -> bool:
+    """
+    Проверяем, находимся ли мы ПОСЛЕ окончания рабочего времени.
+
+    Args:
+        state: Экземпляр состояния симуляции (если None, используется глобальный)
+
+    Returns:
+        True если сейчас после окончания рабочего времени
+    """
+    if state is None:
+        state = get_state()
+    schedule = state.schedule
     current = utils.get_current_time_minutes()
     work_end = utils.time_str_to_minutes(schedule['work_end'])
     return current > work_end
 
 
-def is_break_time() -> Tuple[bool, Optional[str]]:
-    """Проверяет, сейчас ли время перерыва"""
-    schedule = get_state().schedule
+def is_break_time(state: SimulationState = None) -> Tuple[bool, Optional[str]]:
+    """
+    Проверяет, сейчас ли время перерыва.
+
+    Args:
+        state: Экземпляр состояния симуляции (если None, используется глобальный)
+
+    Returns:
+        Кортеж (is_break, break_type) где break_type - 'обед' или 'перерыв'
+    """
+    if state is None:
+        state = get_state()
+    schedule = state.schedule
     current = utils.get_current_time_minutes()
 
     # Проверяем обед
@@ -57,23 +97,43 @@ def is_break_time() -> Tuple[bool, Optional[str]]:
     return False, None
 
 
-def is_after_lunch() -> bool:
-    """Проверяем, находимся ли мы ПОСЛЕ обеденного перерыва"""
-    schedule = get_state().schedule
+def is_after_lunch(state: SimulationState = None) -> bool:
+    """
+    Проверяем, находимся ли мы ПОСЛЕ обеденного перерыва.
+
+    Args:
+        state: Экземпляр состояния симуляции (если None, используется глобальный)
+
+    Returns:
+        True если сейчас после обеденного перерыва
+    """
+    if state is None:
+        state = get_state()
+    schedule = state.schedule
     current = utils.get_current_time_minutes()
     lunch_end = utils.time_str_to_minutes(schedule['lunch_end'])
     return current > lunch_end
 
 
-def should_simulate_afterhours() -> bool:
-    """Определяет, нужна ли активность вне рабочего времени"""
-    mode = get_state().config['afterhours_mode']
+def should_simulate_afterhours(state: SimulationState = None) -> bool:
+    """
+    Определяет, нужна ли активность вне рабочего времени.
+
+    Args:
+        state: Экземпляр состояния симуляции (если None, используется глобальный)
+
+    Returns:
+        True если нужна активность вне рабочего времени
+    """
+    if state is None:
+        state = get_state()
+    mode = state.config['afterhours_mode']
 
     if mode == 'disabled':
         return False
     elif mode == 'before_only':
-        return is_before_work()
+        return is_before_work(state)
     elif mode == 'before_and_after':
-        return not is_work_hours()
+        return not is_work_hours(state)
 
     return False

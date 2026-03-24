@@ -1,0 +1,12 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+    "ANTHROPIC_AUTH_TOKEN": "sk-3cd0fe4de4114fa791f21374afa4b2c5",
+    "ANTHROPIC_MODEL": "deepseek-reasoner",
+    "ANTHROPIC_SMALL_FAST_MODEL": "deepseek-chat",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-reasoner",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-reasoner",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-chat",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "90000"
+  }
+}                            
