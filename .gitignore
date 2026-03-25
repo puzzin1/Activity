@@ -1,7 +1,42 @@
-/__pycache__
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
 **/__pycache__/
-/.claude
-/.vscode
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDEs
+.claude/
+.vscode/
+.idea/
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Config and logs (user-specific)
 activity_config_*.json
 activity_log_*.txt
-config.yaml
+# config.yaml - kept in git as example
+
+# Temporary files
+*.swp
+*.swo
+*~
+.DS_Store

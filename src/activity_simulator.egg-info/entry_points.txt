@@ -1,2 +1,0 @@
-[console_scripts]
-activity-simulator = activity_simulator.main:main
