@@ -1,5 +1,7 @@
 /__pycache__
 **/__pycache__/
+/.claude
+/.vscode
 activity_config_*.json
 activity_log_*.txt
 config.yaml
