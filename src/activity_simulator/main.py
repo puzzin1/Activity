@@ -60,14 +60,14 @@ def main() -> None:
     cfg, sched = config.load_or_create_config()
     state = simulation.init_simulation(cfg, sched)
 
-    # Ротация лог-файлов
-    simulation.setup_log_rotation(state)
-
     # Генерируем имя лог-файла
     log_filename = datetime.now().strftime('activity_log_%Y%m%d_%H%M%S.txt')
 
-    # Инициализируем логгер
+    # Инициализируем логгер (state.log_file_path устанавливается здесь)
     simulation.init_logger(log_filename, enabled=True, verbose=state.config.get('verbose_logging', True), state=state)
+
+    # Ротация лог-файлов (вызывается ПОСЛЕ init_logger, когда state.log_file_path уже установлен)
+    simulation.setup_log_rotation(state)
 
     # Запуск слушателей
     _keyboard_listener = keyboard.Listener(on_press=listeners.on_keyboard_event)
