@@ -134,24 +134,8 @@ def main() -> None:
     print()
     print(f"🍽️ ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:")
     if state.config.get('after_lunch_action', False):
-        sequence_display = state.config.get('after_lunch_sequence', '')
-        # Маскируем текст, но показываем специальные клавиши
-        masked_sequence = ""
-        i = 0
-        while i < len(sequence_display):
-            if sequence_display[i] == '{':
-                end = sequence_display.find('}', i)
-                if end != -1:
-                    masked_sequence += sequence_display[i:end+1]
-                    i = end + 1
-                else:
-                    masked_sequence += '*'
-                    i += 1
-            else:
-                masked_sequence += '*'
-                i += 1
-
-        print(f"  • Ввод последовательности: ✓ ({masked_sequence})")
+        env_var_name = state.config.get('after_lunch_sequence', '')
+        print(f"  • Переменная окружения: {env_var_name}")
         print(f"  • Задержка после обеда: {state.config.get('after_lunch_delay', 5)} сек")
     else:
         print(f"  • Ввод последовательности: ✗ (отключено)")
@@ -235,23 +219,8 @@ def main() -> None:
         simulation.log("", state=state)
         simulation.log("ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:", state=state)
         if state.config.get('after_lunch_action', False):
-            sequence_display = state.config.get('after_lunch_sequence', '')
-            masked_sequence = ""
-            i = 0
-            while i < len(sequence_display):
-                if sequence_display[i] == '{':
-                    end = sequence_display.find('}', i)
-                    if end != -1:
-                        masked_sequence += sequence_display[i:end+1]
-                        i = end + 1
-                    else:
-                        masked_sequence += '*'
-                        i += 1
-                else:
-                    masked_sequence += '*'
-                    i += 1
-
-            simulation.log(f"  • Ввод последовательности: ✓ ({masked_sequence})", state=state)
+            env_var_name = state.config.get('after_lunch_sequence', '')
+            simulation.log(f"  • Переменная окружения: {env_var_name}", state=state)
             simulation.log(f"  • Задержка после обеда: {state.config.get('after_lunch_delay', 5)} сек", state=state)
         else:
             simulation.log(f"  • Ввод последовательности: ✗ (отключено)", state=state)

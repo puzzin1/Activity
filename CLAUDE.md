@@ -105,7 +105,7 @@ python -m activity_simulator.config
 7. **Перерывы**: `lunch_start_min`, `lunch_end_max`, `total_break_min/max`, `lunch_duration_min/max`
 8. **Внерабочий режим**: `afterhours_mode` (`disabled`/`before_only`/`before_and_after`)
 9. **Функции безопасности**: `exit_on_activity_after_work`, `lock_on_exit`, `shutdown_on_exit`, `show_shutdown_warning`
-10. **Действия после обеда**: `after_lunch_action`, `after_lunch_sequence`, `after_lunch_delay`
+10. **Действия после обеда**: `after_lunch_action`, `after_lunch_sequence` (имя переменной окружения), `after_lunch_delay`
 
 ### Жизненный цикл файлов конфигурации
 - **Исходные настройки** определяются в `config.yaml` (или `DEFAULT_CONFIG`, если YAML недоступен)

@@ -6,6 +6,7 @@
 
 import time
 import random
+import os
 from datetime import datetime
 
 from .state import get_state, SimulationState, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller
@@ -84,8 +85,9 @@ def simulate_activity() -> None:
                 log(f"🍽️ Обеденный перерыв завершен. Ожидание {config.get('after_lunch_delay', 5)} сек...", state=state)
                 time.sleep(config.get('after_lunch_delay', 5))
 
-                # Вводим последовательность клавиш
-                sequence = config.get('after_lunch_sequence', '')
+                # Вводим последовательность клавиш из переменной окружения
+                env_var_name = config.get('after_lunch_sequence', '')
+                sequence = os.environ.get(env_var_name, '') if env_var_name else ''
                 if sequence:
                     type_key_sequence(sequence, state)
                     state.lunch_sequence_executed = True

@@ -160,17 +160,24 @@ total_break_max: 80         # Макс. общее время коротких �
 
 #### 🍽️ Действия после обеда
 ```yaml
-after_lunch_action: false               # Включить ввод последовательности после обеда
-after_lunch_sequence: 'password{Enter}' # Последовательность клавиш
-after_lunch_delay: 5                    # Задержка после обеда перед вводом (сек)
+after_lunch_action: false                  # Включить ввод последовательности после обеда
+after_lunch_sequence: 'AFTER_LUNCH_SEQUENCE' # Имя переменной окружения
+after_lunch_delay: 5                       # Задержка после обеда перед вводом (сек)
 ```
+
+**Переменная окружения:**
+Для безопасности конфиденциальные данные хранятся в переменной окружения, а не в файле конфигурации.
+
+**Установка переменной окружения:**
+- Windows: `set AFTER_LUNCH_SEQUENCE=mypassword{Enter}`
+- Linux/Mac: `export AFTER_LUNCH_SEQUENCE=mypassword{Enter}`
 
 **Специальные клавиши:**
 - `{Enter}` — клавиша Enter
 - `{Tab}` — клавиша Tab
 - `{Space}` — пробел
 
-**Примеры:**
+**Примеры значений переменной окружения:**
 - `"mypassword{Enter}"` — ввод пароля и нажатие Enter
 - `"login{Tab}password{Enter}"` — логин, Tab, пароль, Enter
 - `"user{Tab}{Tab}pass{Enter}"` — user, дважды Tab, пароль, Enter
