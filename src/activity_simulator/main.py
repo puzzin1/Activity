@@ -134,8 +134,8 @@ def main() -> None:
     print()
     print(f"🍽️ ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:")
     if state.config.get('after_lunch_action', False):
-        env_var_name = state.config.get('after_lunch_sequence', '')
-        print(f"  • Переменная окружения: {env_var_name}")
+        # Имя переменной окружения не выводим для безопасности
+        print(f"  • Переменная окружения: ***")
         print(f"  • Задержка после обеда: {state.config.get('after_lunch_delay', 5)} сек")
     else:
         print(f"  • Ввод последовательности: ✗ (отключено)")
@@ -262,7 +262,7 @@ def main() -> None:
     # Флаг для корректного завершения
     running = True
 
-    def signal_handler(sig: int, frame) -> None:
+    def signal_handler(sig: int, frame: Optional['object']) -> None:
         """Обработчик сигнала Ctrl+C"""
         nonlocal running
         running = False

@@ -20,7 +20,7 @@ def get_logger() -> Optional[logging.Logger]:
     return _logger
 
 
-def init_logger(file_path: str, enabled: bool = True, verbose: bool = True, state=None) -> None:
+def init_logger(file_path: str, enabled: bool = True, verbose: bool = True, state: Optional['SimulationState'] = None) -> None:
     """
     Инициализирует глобальный логгер с FileHandler и StreamHandler.
 
@@ -79,7 +79,42 @@ def close_logger() -> None:
         _logger = None
 
 
-def log(message: str, level: str = 'INFO', state: SimulationState = None) -> None:
+def _mask_sensitive_data(message: str) -> str:
+    """
+    Маскирует конфиденциальные данные в сообщении лога.
+
+    Args:
+        message: Исходное сообщение
+
+    Returns:
+        Сообщение с замаскированными секретами
+    """
+    import re
+
+    # Маскируем значения переменных окружения в f-строках типа: '...'
+    if re.search(r"env_var_name\s*=\s*['\"](.*?)['\"]", message):
+        message = re.sub(r"(env_var_name\s*=\s*['\"])(.*?)(['\"])", r"\1***\3", message)
+
+    # Маскируем имена переменных окружения в сообщениях о последовательностях
+    if re.search(r"after_lunch_sequence['\"]?:\s*['\"](.*?)['\"]", message):
+        message = re.sub(r"(['\"]?after_lunch_sequence['\"]?:\s*['\"])(.*?)(['\"])", r"\1***\3", message)
+
+    # Маскируем значение последовательности клавиш (если попало в лог)
+    if re.search(r"sequence['\"]?:\s*['\"][^'\"]{3,}['\"]", message):
+        message = re.sub(r"(['\"]?sequence['\"]?:\s*['\"])([^'\"]{3,})(['\"])", r"\1***\3", message)
+
+    # Маскируем имя переменной окружения в сообщении "Переменная окружения: ..."
+    if re.search(r"Переменная окружения:\s*(.+)", message):
+        message = re.sub(r"(Переменная окружения:\s*)(.+)", r"\1***", message)
+
+    # Маскируем значение переменной окружения в конце строки (для шаблонов типа f"... {env_var_name}")
+    if re.search(r"env_var_name$", message):
+        message = "***"
+
+    return message
+
+
+def log(message: str, level: str = 'INFO', state: Optional['SimulationState'] = None) -> None:
     """
     Функция для логирования.
 
@@ -88,6 +123,9 @@ def log(message: str, level: str = 'INFO', state: SimulationState = None) -> Non
         level: Уровень логирования (INFO, WARNING, ERROR, DEBUG)
         state: Экземпляр состояния симуляции (если None, используется глобальный)
     """
+    # Маскируем конфиденциальные данные
+    message = _mask_sensitive_data(message)
+
     if _logger is None:
         # Fallback: прямой вывод если логгер не инициализирован
         from datetime import datetime
@@ -103,7 +141,7 @@ def log(message: str, level: str = 'INFO', state: SimulationState = None) -> Non
     _logger.log(log_level, message)
 
 
-def setup_log_rotation(state: SimulationState = None) -> None:
+def setup_log_rotation(state: Optional['SimulationState'] = None) -> None:
     """
     Настраивает RotatingFileHandler для ротации лог-файлов.
 

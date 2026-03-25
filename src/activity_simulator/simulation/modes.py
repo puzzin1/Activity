@@ -23,7 +23,7 @@ def execute_burst_activity(
     mode_name: str,
     time_indicator: str = "",
     check_break_ended: Optional[Callable[[], Tuple[bool, Optional[str]]]] = None,
-    state: SimulationState = None,
+    state: Optional['SimulationState'] = None,
 ) -> str:
     """
     Универсальная функция выполнения всплеска активности.

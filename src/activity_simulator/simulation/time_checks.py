@@ -11,7 +11,7 @@ from .. import utils
 from .state import get_state, SimulationState
 
 
-def is_work_hours(state: SimulationState = None) -> bool:
+def is_work_hours(state: Optional['SimulationState'] = None) -> bool:
     """
     Проверяет, находимся ли мы в рабочее время.
 
@@ -30,7 +30,7 @@ def is_work_hours(state: SimulationState = None) -> bool:
     return work_start <= current <= work_end
 
 
-def is_before_work(state: SimulationState = None) -> bool:
+def is_before_work(state: Optional['SimulationState'] = None) -> bool:
     """
     Проверяет, находимся ли мы ДО начала рабочего времени.
 
@@ -48,7 +48,7 @@ def is_before_work(state: SimulationState = None) -> bool:
     return current < work_start
 
 
-def is_after_work(state: SimulationState = None) -> bool:
+def is_after_work(state: Optional['SimulationState'] = None) -> bool:
     """
     Проверяем, находимся ли мы ПОСЛЕ окончания рабочего времени.
 
@@ -66,7 +66,7 @@ def is_after_work(state: SimulationState = None) -> bool:
     return current > work_end
 
 
-def is_break_time(state: SimulationState = None) -> Tuple[bool, Optional[str]]:
+def is_break_time(state: Optional['SimulationState'] = None) -> Tuple[bool, Optional[str]]:
     """
     Проверяет, сейчас ли время перерыва.
 
@@ -97,7 +97,7 @@ def is_break_time(state: SimulationState = None) -> Tuple[bool, Optional[str]]:
     return False, None
 
 
-def is_after_lunch(state: SimulationState = None) -> bool:
+def is_after_lunch(state: Optional['SimulationState'] = None) -> bool:
     """
     Проверяем, находимся ли мы ПОСЛЕ обеденного перерыва.
 
@@ -115,7 +115,7 @@ def is_after_lunch(state: SimulationState = None) -> bool:
     return current > lunch_end
 
 
-def should_simulate_afterhours(state: SimulationState = None) -> bool:
+def should_simulate_afterhours(state: Optional['SimulationState'] = None) -> bool:
     """
     Определяет, нужна ли активность вне рабочего времени.
 

@@ -3,26 +3,26 @@
 Содержит функции-слушатели для отслеживания активности пользователя.
 """
 
-from typing import Union
+from typing import Union, Optional, TYPE_CHECKING
 import time
 import sys
 
 # Импортируем типы pynput только для проверки типов, не во время выполнения
-if sys.version_info >= (3, 8):
-    from typing import TYPE_CHECKING
-else:
-    TYPE_CHECKING = False
-
 if TYPE_CHECKING:
     from pynput.keyboard import Key, KeyCode
     from pynput.mouse import Button
+else:
+    # Заглушки для runtime
+    Key = None  # type: ignore
+    KeyCode = None  # type: ignore
+    Button = None  # type: ignore
 
 from . import simulation
 
 
 # === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
-def _check_and_update_activity_after_work(state=None) -> bool:
+def _check_and_update_activity_after_work(state: Optional['simulation.SimulationState'] = None) -> bool:
     """
     Проверяет активность после рабочего дня и обновляет флаг.
     Возвращает True, если нужно прервать обработку (послерабочее время).
@@ -45,7 +45,7 @@ def _check_and_update_activity_after_work(state=None) -> bool:
 
 # === ФУНКЦИИ-СЛУШАТЕЛИ ===
 
-def on_keyboard_event(key: Union['Key', 'KeyCode'], state=None) -> None:
+def on_keyboard_event(key: Union[Key, KeyCode], state: Optional['simulation.SimulationState'] = None) -> None:
     """
     Обработчик нажатий клавиатуры.
 
@@ -71,7 +71,7 @@ def on_keyboard_event(key: Union['Key', 'KeyCode'], state=None) -> None:
         simulation.log(f"Обнаружена активность клавиатуры", 'DEBUG', state)
 
 
-def on_mouse_event(x: int, y: int, state=None) -> None:
+def on_mouse_event(x: int, y: int, state: Optional['simulation.SimulationState'] = None) -> None:
     """
     Обработчик движения мыши/тачпада.
     Автоматически отслеживает как движения мыши, так и тачпада.
@@ -104,7 +104,7 @@ def on_mouse_event(x: int, y: int, state=None) -> None:
             state.last_mouse_log_time = current_time
 
 
-def on_mouse_click(x: int, y: int, button: 'Button', pressed: bool, state=None) -> None:
+def on_mouse_click(x: int, y: int, button: Button, pressed: bool, state: Optional['simulation.SimulationState'] = None) -> None:
     """
     Обработчик кликов мыши/тачпада.
     Автоматически отслеживает как клики мыши, так и тапы тачпада.

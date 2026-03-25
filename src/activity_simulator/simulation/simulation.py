@@ -8,6 +8,7 @@ import time
 import random
 import os
 from datetime import datetime
+from typing import Optional
 
 from .state import get_state, SimulationState, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller
 from .logger import log
@@ -135,7 +136,7 @@ def simulate_activity() -> None:
         continue
 
 
-def _handle_work_day_finished(state: SimulationState = None) -> None:
+def _handle_work_day_finished(state: Optional['SimulationState'] = None) -> None:
     """
     Обрабатывает завершение рабочего дня.
 
@@ -196,7 +197,7 @@ def _handle_work_day_finished(state: SimulationState = None) -> None:
     raise ExitSimulation("Рабочий день завершен", show_warning=False)
 
 
-def _handle_afterhours_burst(last_burst_time_list: list, state: SimulationState = None) -> None:
+def _handle_afterhours_burst(last_burst_time_list: list, state: Optional['SimulationState'] = None) -> None:
     """
     Обрабатывает всплеск активности внерабочего режима.
 
@@ -214,11 +215,9 @@ def _handle_afterhours_burst(last_burst_time_list: list, state: SimulationState 
         config['afterhours_burst_interval_max'] * 60
     )
 
-    # Проверяем, прошло ли минимум MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд
-    with state.lock:
-        time_since_user_activity = time.time() - state.last_activity_time
-
-    if time_since_burst >= burst_interval and time_since_user_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+    # Проверяем условия атомарно — вычисляем time_since_user_activity внутри условия
+    # чтобы избежать race condition между вычислением и проверкой
+    if time_since_burst >= burst_interval and (lambda: (time.time() - state.last_activity_time))() >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
         burst_duration = random.uniform(
             config['afterhours_burst_duration_min'],
             config['afterhours_burst_duration_max']
@@ -256,16 +255,19 @@ def _handle_afterhours_burst(last_burst_time_list: list, state: SimulationState 
             last_burst_time_list[0] = time.time()
             log(f"{time_indicator} Всплеск активности завершен. Следующий через {burst_interval/60:.1f} мин", state=state)
 
-    elif time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
-        # Ждем, пока не пройдет минимальная задержка после активности пользователя
-        remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_user_activity
-        log(f"⏸️  Ожидание после активности пользователя: {remaining:.1f} сек", 'DEBUG', state)
-        time.sleep(10)
+    else:
+        # Проверяем ожидание после активности пользователя
+        with state.lock:
+            time_since_user_activity = time.time() - state.last_activity_time
+        if time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+            remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_user_activity
+            log(f"⏸️  Ожидание после активности пользователя: {remaining:.1f} сек", 'DEBUG', state)
+            time.sleep(10)
+        else:
+            time.sleep(10)
 
-    time.sleep(10)
 
-
-def _handle_break_burst(last_break_burst_time_list: list, state: SimulationState = None) -> None:
+def _handle_break_burst(last_break_burst_time_list: list, state: Optional['SimulationState'] = None) -> None:
     """
     Обрабатывает всплеск активности во время перерыва.
 
@@ -283,11 +285,9 @@ def _handle_break_burst(last_break_burst_time_list: list, state: SimulationState
         config['afterhours_burst_interval_max'] * 60
     )
 
-    # Проверяем, прошло ли минимум MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд
-    with state.lock:
-        time_since_user_activity = time.time() - state.last_activity_time
-
-    if time_since_break_burst >= burst_interval and time_since_user_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+    # Проверяем условия атомарно — вычисляем time_since_user_activity внутри условия
+    # чтобы избежать race condition между вычислением и проверкой
+    if time_since_break_burst >= burst_interval and (lambda: (time.time() - state.last_activity_time))() >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
         burst_duration = random.uniform(
             config['afterhours_burst_duration_min'],
             config['afterhours_burst_duration_max']
@@ -344,16 +344,19 @@ def _handle_break_burst(last_break_burst_time_list: list, state: SimulationState
             last_break_burst_time_list[0] = time.time()
             log(f"☕ Перерыв ({break_type_check}): всплеск активности завершен. Следующий через {burst_interval/60:.1f} мин", state=state)
 
-    elif time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
-        # Ждем, пока не пройдет минимальная задержка после активности пользователя
-        remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_user_activity
-        log(f"⏸️  Ожидание после активности пользователя: {remaining:.1f} сек", 'DEBUG', state)
-        time.sleep(10)
+    else:
+        # Проверяем ожидание после активности пользователя
+        with state.lock:
+            time_since_user_activity = time.time() - state.last_activity_time
+        if time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+            remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_user_activity
+            log(f"⏸️  Ожидание после активности пользователя: {remaining:.1f} сек", 'DEBUG', state)
+            time.sleep(10)
+        else:
+            time.sleep(10)
 
-    time.sleep(10)
 
-
-def _perform_light_action(state: SimulationState = None) -> None:
+def _perform_light_action(state: Optional['SimulationState'] = None) -> None:
     """
     Выполняет легкое действие (используется в перерывах и внерабочем режиме).
 
@@ -397,7 +400,7 @@ def _perform_light_action(state: SimulationState = None) -> None:
         state.last_activity_time = time.time()
 
 
-def _handle_work_mode(state: SimulationState = None) -> None:
+def _handle_work_mode(state: Optional['SimulationState'] = None) -> None:
     """
     Обрабатывает обычный рабочий режим.
 
@@ -419,9 +422,9 @@ def _handle_work_mode(state: SimulationState = None) -> None:
         new_threshold = random.randint(config['min_idle_time'], config['max_idle_time'])
 
         # Гарантируем, что порог не меньше MINIMUM_DELAY_AFTER_USER_ACTIVITY
-        effective_threshold = max(new_threshold, MINIMUM_DELAY_AFTER_USER_ACTIVITY)
+        effective_threshold = float(max(new_threshold, MINIMUM_DELAY_AFTER_USER_ACTIVITY))
         if effective_threshold < time_since_last_activity:
-            effective_threshold = time_since_last_activity + 5  # Добавляем запас 5 сек
+            effective_threshold = time_since_last_activity + 5.0  # Добавляем запас 5 сек
 
         with state.lock:
             state.current_idle_threshold = effective_threshold
@@ -526,7 +529,7 @@ def _handle_work_mode(state: SimulationState = None) -> None:
         time.sleep(1)
 
 
-def show_stats(state: SimulationState = None) -> None:
+def show_stats(state: Optional['SimulationState'] = None) -> None:
     """
     Периодический вывод статистики выполненных действий.
 

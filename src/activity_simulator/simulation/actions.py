@@ -8,6 +8,7 @@
 import time
 import random
 from datetime import datetime
+from typing import Optional
 
 from .. import utils
 from .state import get_state, SimulationState, get_mouse_controller, get_keyboard_controller, MINIMUM_DELAY_AFTER_USER_ACTIVITY
@@ -17,7 +18,7 @@ from .time_checks import is_before_work
 
 # === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
-def get_consecutive_safe_key_count(state: SimulationState = None) -> int:
+def get_consecutive_safe_key_count(state: Optional['SimulationState'] = None) -> int:
     """
     Возвращает количество подряд идущих safe_key действий в конце истории.
 
@@ -39,7 +40,7 @@ def get_consecutive_safe_key_count(state: SimulationState = None) -> int:
     return count
 
 
-def move_mouse_naturally(target_x: int, target_y: int, state: SimulationState = None) -> None:
+def move_mouse_naturally(target_x: int, target_y: int, state: Optional['SimulationState'] = None) -> None:
     """
     Плавное перемещение мыши к целевой позиции.
 
@@ -102,7 +103,7 @@ def move_mouse_naturally(target_x: int, target_y: int, state: SimulationState = 
 
 # === ФУНКЦИИ ВЫПОЛНЕНИЯ ДЕЙСТВИЙ ===
 
-def type_key_sequence(sequence: str, state: SimulationState = None) -> None:
+def type_key_sequence(sequence: str, state: Optional['SimulationState'] = None) -> None:
     """
     Вводит последовательность клавиш, включая специальные клавиши.
 
@@ -135,21 +136,18 @@ def type_key_sequence(sequence: str, state: SimulationState = None) -> None:
                 keyboard_controller.press(Key.enter)
                 time.sleep(0.05)
                 keyboard_controller.release(Key.enter)
-                log(f"  • Нажата клавиша")
                 time.sleep(random.uniform(0.1, 0.3))
 
             elif element == "Tab":
                 keyboard_controller.press(Key.tab)
                 time.sleep(0.05)
                 keyboard_controller.release(Key.tab)
-                log(f"  • Нажата клавиша")
                 time.sleep(random.uniform(0.1, 0.3))
 
             elif element == "Space":
                 keyboard_controller.press(Key.space)
                 time.sleep(0.05)
                 keyboard_controller.release(Key.space)
-                log(f"  • Нажата клавиша")
                 time.sleep(random.uniform(0.05, 0.15))
 
             else:
@@ -157,8 +155,6 @@ def type_key_sequence(sequence: str, state: SimulationState = None) -> None:
                 for char in element:
                     keyboard_controller.type(char)
                     time.sleep(random.uniform(0.05, 0.15))  # Задержка между символами
-
-                log(f"  • Введен текст: {'*' * len(element)}")  # Маскируем текст в логе
 
         log(f"✅ Последовательность клавиш введена успешно")
 
@@ -170,7 +166,7 @@ def type_key_sequence(sequence: str, state: SimulationState = None) -> None:
             state.is_performing_action = False
 
 
-def show_shutdown_warning(state: SimulationState = None) -> bool:
+def show_shutdown_warning(state: Optional['SimulationState'] = None) -> bool:
     """
     Показывает всплывающее окно с предупреждением о выключении.
 
@@ -186,7 +182,7 @@ def show_shutdown_warning(state: SimulationState = None) -> bool:
     from threading import Timer
     timer = None
 
-    def on_cancel():
+    def on_cancel() -> None:
         nonlocal timer
         state.shutdown_cancelled = True
         log("⚠️ Выключение отменено пользователем")
@@ -197,7 +193,7 @@ def show_shutdown_warning(state: SimulationState = None) -> bool:
                 pass
         root.destroy()
 
-    def on_timeout():
+    def on_timeout() -> None:
         try:
             root.destroy()
         except:
@@ -248,7 +244,7 @@ def show_shutdown_warning(state: SimulationState = None) -> bool:
     return not state.shutdown_cancelled
 
 
-def random_mouse_move(state: SimulationState = None) -> None:
+def random_mouse_move(state: Optional['SimulationState'] = None) -> None:
     """
     Случайное движение мыши в пределах заданного диапазона.
 
@@ -290,7 +286,7 @@ def random_mouse_move(state: SimulationState = None) -> None:
     state.initial_mouse_position = get_mouse_controller().position
 
 
-def random_arrow_press(state: SimulationState = None) -> None:
+def random_arrow_press(state: Optional['SimulationState'] = None) -> None:
     """
     Нажатие клавиш-стрелок (имитация прокрутки/навигации).
 
@@ -348,7 +344,7 @@ def random_arrow_press(state: SimulationState = None) -> None:
     state.action_history.append(('keyboard', time.time()))
 
 
-def random_mouse_click(state: SimulationState = None) -> None:
+def random_mouse_click(state: Optional['SimulationState'] = None) -> None:
     """
     Клик левой кнопкой мыши в текущей позиции.
 
@@ -373,7 +369,7 @@ def random_mouse_click(state: SimulationState = None) -> None:
     state.action_history.append(('mouse_click', time.time()))
 
 
-def safe_key_press(state: SimulationState = None) -> None:
+def safe_key_press(state: Optional['SimulationState'] = None) -> None:
     """
     Нажатие безопасной клавиши (Shift) - не производит побочных эффектов.
 
@@ -401,7 +397,7 @@ def safe_key_press(state: SimulationState = None) -> None:
     state.action_history.append(('safe_key', time.time()))
 
 
-def control_tab_press(state: SimulationState = None) -> None:
+def control_tab_press(state: Optional['SimulationState'] = None) -> None:
     """
     Нажатие Ctrl+Tab (переключение вкладок).
 

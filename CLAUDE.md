@@ -79,15 +79,22 @@ activity-simulator
 activity.bat
 ```
 
-### Тестирование модуля конфигурации
+### Тестирование
 ```bash
+# Запуск тестов
+pytest
+
+# Запуск тестов с покрытием кода
+pytest --cov=activity_simulator --cov-report=term-missing
+
 # Запуск config.py напрямую для тестирования генерации расписания
 python -m activity_simulator.config
 ```
 
 ### Заметки по разработке
-- Нет традиционной системы сборки (нет `requirements.txt`, `pyproject.toml`, `setup.py`)
-- Нет юнит-тестов или конфигурации линтинга
+- **Система сборки**: `pyproject.toml` с setuptools
+- **Тесты**: pytest с поддержкой покрытия (pytest-cov)
+- **Линтинг**: mypy с включенной проверкой типов (`disallow_untyped_defs = true`)
 - Git игнорирует файлы `*.json` и `*.txt`, чтобы не коммитить конфигурационные/лог-файлы
 
 ## Конфигурация и настройка

@@ -11,7 +11,7 @@ from datetime import datetime
 
 # Попытка импорта YAML
 try:
-    import yaml
+    import yaml  # type: ignore
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
@@ -529,7 +529,7 @@ def generate_schedule(config: Dict[str, Any]) -> Dict[str, Any]:
             - breaks: список коротких перерывов
             - is_friday: флаг, является ли день пятницей
     """
-    schedule = {}
+    schedule: Dict[str, Any] = {}
 
     # Проверяем, сегодня ли пятница (weekday: 0=Пн, 1=Вт, 2=Ср, 3=Чт, 4=Пт)
     is_friday = datetime.now().weekday() == 4
@@ -602,7 +602,7 @@ def generate_schedule(config: Dict[str, Any]) -> Dict[str, Any]:
     schedule['breaks'] = []
 
     # Распределяем перерывы по периодам (поровну между утром и после обеда)
-    breaks_per_period = [[], []]
+    breaks_per_period: List[List[int]] = [[], []]
     for i, break_dur in enumerate(breaks):
         period_idx = i % 2  # Чередуем между периодами
         breaks_per_period[period_idx].append(break_dur)

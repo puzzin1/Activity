@@ -5,9 +5,13 @@
 константы и исключения.
 """
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
 from threading import Lock
 from collections import deque
+
+if TYPE_CHECKING:
+    from pynput.mouse import Controller
+    from pynput.keyboard import KeyboardController
 
 
 # === ИМЕНОВАННЫЕ КОНСТАНТЫ ===
@@ -31,7 +35,7 @@ class ExitSimulation(Exception):
     Позволяет заменить os._exit() на более чистый механизм выхода,
     который позволяет корректно завершить все потоки и слушатели.
     """
-    def __init__(self, message, should_lock=False, should_shutdown=False, show_warning=True):
+    def __init__(self, message: str, should_lock: bool = False, should_shutdown: bool = False, show_warning: bool = True) -> None:
         super().__init__(message)
         self.should_lock = should_lock
         self.should_shutdown = should_shutdown
@@ -43,7 +47,7 @@ _mouse_controller = None
 _keyboard_controller = None
 
 
-def get_mouse_controller():
+def get_mouse_controller() -> 'Controller':
     """Возвращает контроллер мыши, инициализируя его при первом вызове."""
     global _mouse_controller
     if _mouse_controller is None:
@@ -52,7 +56,7 @@ def get_mouse_controller():
     return _mouse_controller
 
 
-def get_keyboard_controller():
+def get_keyboard_controller() -> 'KeyboardController':
     """Возвращает контроллер клавиатуры, инициализируя его при первом вызове."""
     global _keyboard_controller
     if _keyboard_controller is None:
@@ -79,12 +83,12 @@ class SimulationState:
         """Инициализирует состояние симуляции с начальными значениями."""
         self._lock: Lock = Lock()
         self._last_activity_time: float = 0.0
-        self._initial_mouse_position: Optional[Tuple[int, int]] = None
+        self._initial_mouse_position: Tuple[int, int] = (0, 0)
         self._absolute_anchor_position: Optional[Tuple[int, int]] = None
         self._is_simulating: bool = False
         self._is_performing_action: bool = False
         self._action_history: deque[Tuple[str, float]] = deque(maxlen=ACTION_HISTORY_CLEAR_THRESHOLD)
-        self._current_idle_threshold: Optional[int] = None
+        self._current_idle_threshold: Optional[float] = None
         self._last_mouse_log_time: float = 0.0
         self._lunch_sequence_executed: bool = False
         self._shutdown_cancelled: bool = False
@@ -113,12 +117,12 @@ class SimulationState:
         self._last_activity_time = value
 
     @property
-    def initial_mouse_position(self) -> Optional[Tuple[int, int]]:
+    def initial_mouse_position(self) -> Tuple[int, int]:
         """Начальная позиция мыши."""
         return self._initial_mouse_position
 
     @initial_mouse_position.setter
-    def initial_mouse_position(self, value: Optional[Tuple[int, int]]) -> None:
+    def initial_mouse_position(self, value: Tuple[int, int]) -> None:
         self._initial_mouse_position = value
 
     @property
@@ -163,12 +167,12 @@ class SimulationState:
         self._log_file_path = value
 
     @property
-    def current_idle_threshold(self) -> Optional[int]:
+    def current_idle_threshold(self) -> Optional[float]:
         """Текущий порог бездействия."""
         return self._current_idle_threshold
 
     @current_idle_threshold.setter
-    def current_idle_threshold(self, value: Optional[int]) -> None:
+    def current_idle_threshold(self, value: Optional[float]) -> None:
         self._current_idle_threshold = value
 
     @property
@@ -258,12 +262,12 @@ class SimulationState:
 
     # === Контекстный менеджер для работы с блокировкой ===
 
-    def __enter__(self):
+    def __enter__(self) -> 'SimulationState':
         """Вход в контекст с блокировкой."""
         self._lock.acquire()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         """Выход из контекста с разблокировкой."""
         self._lock.release()
 
