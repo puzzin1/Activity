@@ -127,11 +127,7 @@ def format_startup_info(state: 'simulation.SimulationState', for_log: bool = Fal
         lines.append("🍽️ ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:")
 
     if state.config.get('after_lunch_action', False):
-        env_var_name = state.config.get('after_lunch_sequence', '')
-        if for_log:
-            lines.append(f"  • Переменная окружения: {env_var_name}")
-        else:
-            lines.append(f"  • Переменная окружения: ***")
+        lines.append(f"  • Переменная окружения: ***")
         lines.append(f"  • Задержка после обеда: {state.config.get('after_lunch_delay', 5)} сек")
     else:
         lines.append(f"  • Ввод последовательности: ✗ (отключено)")

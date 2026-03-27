@@ -9,6 +9,7 @@ import os
 import sys
 import platform
 import subprocess
+from subprocess import CalledProcessError
 import tkinter as tk
 from tkinter import messagebox
 from threading import Timer
@@ -156,8 +157,13 @@ def shutdown_computer() -> Tuple[bool, str]:
             return True, "🔌 Компьютер выключается (Windows)"
         elif system == "Darwin":  # macOS
             # macOS: принудительное выключение
-            subprocess.call(['sudo', 'shutdown', '-h', 'now'])
-            return True, "🔌 Компьютер выключается (macOS)"
+            try:
+                subprocess.run(['sudo', 'shutdown', '-h', 'now'], check=True)
+                return True, "🔌 Компьютер выключается (macOS)"
+            except CalledProcessError:
+                return False, "⚠️ Не удалось выключить компьютер (macOS): требуется sudo без пароля или команда недоступна"
+            except FileNotFoundError:
+                return False, "⚠️ Не удалось выключить компьютер (macOS): команда shutdown не найдена"
         elif system == "Linux":
             # Linux: принудительное выключение
             try:
