@@ -373,3 +373,366 @@ class TestIsAfterLunch:
 
         from activity_simulator.simulation.time_checks import is_after_lunch
         assert is_after_lunch() is False
+
+
+class TestParametricTimeChecks:
+    """Параметрические тесты для функций проверки времени с разными расписаниями"""
+
+    @pytest.mark.parametrize("schedule,current_time_minutes,expected_work", [
+        # Стандартное расписание 9-18
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            540,  # 09:00
+            True
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            1079,  # 17:59
+            True
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            1080,  # 18:00
+            True
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            1081,  # 18:01
+            False
+        ),
+        # Раннее начало 8-17
+        (
+            {'work_start': '08:00', 'work_end': '17:00', 'lunch_start': '12:00', 'lunch_end': '13:00', 'breaks': []},
+            480,  # 08:00
+            True
+        ),
+        (
+            {'work_start': '08:00', 'work_end': '17:00', 'lunch_start': '12:00', 'lunch_end': '13:00', 'breaks': []},
+            1020,  # 17:00
+            True
+        ),
+        (
+            {'work_start': '08:00', 'work_end': '17:00', 'lunch_start': '12:00', 'lunch_end': '13:00', 'breaks': []},
+            540,  # 09:00
+            True
+        ),
+        # Позднее начало 10-19
+        (
+            {'work_start': '10:00', 'work_end': '19:00', 'lunch_start': '14:00', 'lunch_end': '15:00', 'breaks': []},
+            600,  # 10:00
+            True
+        ),
+        (
+            {'work_start': '10:00', 'work_end': '19:00', 'lunch_start': '14:00', 'lunch_end': '15:00', 'breaks': []},
+            1140,  # 19:00
+            True
+        ),
+        (
+            {'work_start': '10:00', 'work_end': '19:00', 'lunch_start': '14:00', 'lunch_end': '15:00', 'breaks': []},
+            540,  # 09:00
+            False
+        ),
+        # Короткий день (пятница) 9-16
+        (
+            {'work_start': '09:00', 'work_end': '16:00', 'lunch_start': '12:30', 'lunch_end': '13:30', 'breaks': []},
+            540,  # 09:00
+            True
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '16:00', 'lunch_start': '12:30', 'lunch_end': '13:30', 'breaks': []},
+            960,  # 16:00
+            True
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '16:00', 'lunch_start': '12:30', 'lunch_end': '13:30', 'breaks': []},
+            961,  # 16:01
+            False
+        ),
+    ])
+    @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
+    @patch('activity_simulator.simulation.time_checks.get_state')
+    def test_is_work_hours_parametric(self, mock_state, mock_time, schedule, current_time_minutes, expected_work):
+        """Параметрический тест для is_work_hours с разными расписаниями"""
+        mock_time.return_value = current_time_minutes
+
+        mock_state_obj = MagicMock()
+        mock_state_obj.schedule = schedule
+        mock_state.return_value = mock_state_obj
+
+        from activity_simulator.simulation.time_checks import is_work_hours
+        assert is_work_hours() is expected_work
+
+    @pytest.mark.parametrize("schedule,current_time_minutes,expected_break,expected_type", [
+        # Стандартное расписание с обедом 13-14
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            780,  # 13:00
+            True,
+            'обед'
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            839,  # 13:59
+            True,
+            'обед'
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            720,  # 12:00
+            False,
+            None
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            840,  # 14:00
+            True,  # is_break_time использует <=, поэтому 14:00 еще в перерыве
+            'обед'
+        ),
+        # С коротким перерывами
+        (
+            {
+                'work_start': '09:00', 'work_end': '18:00',
+                'lunch_start': '13:00', 'lunch_end': '14:00',
+                'breaks': [
+                    {'start': '10:30', 'end': '10:40', 'duration': 10},
+                    {'start': '15:30', 'end': '15:45', 'duration': 15}
+                ]
+            },
+            630,  # 10:30
+            True,
+            'перерыв'
+        ),
+        (
+            {
+                'work_start': '09:00', 'work_end': '18:00',
+                'lunch_start': '13:00', 'lunch_end': '14:00',
+                'breaks': [
+                    {'start': '10:30', 'end': '10:40', 'duration': 10},
+                    {'start': '15:30', 'end': '15:45', 'duration': 15}
+                ]
+            },
+            639,  # 10:39
+            True,
+            'перерыв'
+        ),
+        (
+            {
+                'work_start': '09:00', 'work_end': '18:00',
+                'lunch_start': '13:00', 'lunch_end': '14:00',
+                'breaks': [
+                    {'start': '10:30', 'end': '10:40', 'duration': 10},
+                    {'start': '15:30', 'end': '15:45', 'duration': 15}
+                ]
+            },
+            640,  # 10:40
+            True,  # is_break_time использует <=, поэтому 10:40 еще в перерыве
+            'перерыв'
+        ),
+        (
+            {
+                'work_start': '09:00', 'work_end': '18:00',
+                'lunch_start': '13:00', 'lunch_end': '14:00',
+                'breaks': [
+                    {'start': '10:30', 'end': '10:40', 'duration': 10},
+                    {'start': '15:30', 'end': '15:45', 'duration': 15}
+                ]
+            },
+            930,  # 15:30
+            True,
+            'перерыв'
+        ),
+        (
+            {
+                'work_start': '09:00', 'work_end': '18:00',
+                'lunch_start': '13:00', 'lunch_end': '14:00',
+                'breaks': [
+                    {'start': '10:30', 'end': '10:40', 'duration': 10},
+                    {'start': '15:30', 'end': '15:45', 'duration': 15}
+                ]
+            },
+            944,  # 15:44
+            True,
+            'перерыв'
+        ),
+        # Пятница с ранним обедом
+        (
+            {
+                'work_start': '09:00', 'work_end': '16:00',
+                'lunch_start': '12:00', 'lunch_end': '13:00',
+                'breaks': [
+                    {'start': '10:00', 'end': '10:10', 'duration': 10}
+                ]
+            },
+            600,  # 10:00
+            True,
+            'перерыв'
+        ),
+        (
+            {
+                'work_start': '09:00', 'work_end': '16:00',
+                'lunch_start': '12:00', 'lunch_end': '13:00',
+                'breaks': [
+                    {'start': '10:00', 'end': '10:10', 'duration': 10}
+                ]
+            },
+            720,  # 12:00
+            True,
+            'обед'
+        ),
+    ])
+    @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
+    @patch('activity_simulator.simulation.time_checks.get_state')
+    def test_is_break_time_parametric(self, mock_state, mock_time, schedule, current_time_minutes, expected_break, expected_type):
+        """Параметрический тест для is_break_time с разными расписаниями"""
+        mock_time.return_value = current_time_minutes
+
+        mock_state_obj = MagicMock()
+        mock_state_obj.schedule = schedule
+        mock_state.return_value = mock_state_obj
+
+        from activity_simulator.simulation.time_checks import is_break_time
+        on_break, break_type = is_break_time()
+        assert on_break is expected_break
+        assert break_type == expected_type
+
+    @pytest.mark.parametrize("schedule,current_time_minutes,expected_after_lunch", [
+        # Стандартный обед 13-14
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            780,  # 13:00
+            False
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            839,  # 13:59
+            False
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            841,  # 14:01
+            True
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            900,  # 15:00
+            True
+        ),
+        # Ранний обед 12-13
+        (
+            {'work_start': '08:00', 'work_end': '17:00', 'lunch_start': '12:00', 'lunch_end': '13:00', 'breaks': []},
+            720,  # 12:00
+            False
+        ),
+        (
+            {'work_start': '08:00', 'work_end': '17:00', 'lunch_start': '12:00', 'lunch_end': '13:00', 'breaks': []},
+            781,  # 13:01
+            True
+        ),
+        (
+            {'work_start': '08:00', 'work_end': '17:00', 'lunch_start': '12:00', 'lunch_end': '13:00', 'breaks': []},
+            1020,  # 17:00
+            True
+        ),
+        # Поздний обед 14-15
+        (
+            {'work_start': '10:00', 'work_end': '19:00', 'lunch_start': '14:00', 'lunch_end': '15:00', 'breaks': []},
+            840,  # 14:00
+            False  # is_after_lunch использует >, поэтому 14:00 еще не "после обеда"
+        ),
+        (
+            {'work_start': '10:00', 'work_end': '19:00', 'lunch_start': '14:00', 'lunch_end': '15:00', 'breaks': []},
+            901,  # 15:01
+            True
+        ),
+    ])
+    @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
+    @patch('activity_simulator.simulation.time_checks.get_state')
+    def test_is_after_lunch_parametric(self, mock_state, mock_time, schedule, current_time_minutes, expected_after_lunch):
+        """Параметрический тест для is_after_lunch с разными расписаниями"""
+        mock_time.return_value = current_time_minutes
+
+        mock_state_obj = MagicMock()
+        mock_state_obj.schedule = schedule
+        mock_state.return_value = mock_state_obj
+
+        from activity_simulator.simulation.time_checks import is_after_lunch
+        assert is_after_lunch() is expected_after_lunch
+
+    @pytest.mark.parametrize("schedule,current_time_minutes,expected_before_work,expected_after_work", [
+        # Стандартное расписание 9-18
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            480,  # 08:00
+            True,
+            False
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            540,  # 09:00
+            False,
+            False
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            1080,  # 18:00
+            False,
+            False
+        ),
+        (
+            {'work_start': '09:00', 'work_end': '18:00', 'lunch_start': '13:00', 'lunch_end': '14:00', 'breaks': []},
+            1081,  # 18:01
+            False,
+            True
+        ),
+        # Раннее начало 8-17
+        (
+            {'work_start': '08:00', 'work_end': '17:00', 'lunch_start': '12:00', 'lunch_end': '13:00', 'breaks': []},
+            420,  # 07:00
+            True,
+            False
+        ),
+        (
+            {'work_start': '08:00', 'work_end': '17:00', 'lunch_start': '12:00', 'lunch_end': '13:00', 'breaks': []},
+            1020,  # 17:00
+            False,
+            False
+        ),
+        (
+            {'work_start': '08:00', 'work_end': '17:00', 'lunch_start': '12:00', 'lunch_end': '13:00', 'breaks': []},
+            1021,  # 17:01
+            False,
+            True
+        ),
+        # Позднее начало 10-19
+        (
+            {'work_start': '10:00', 'work_end': '19:00', 'lunch_start': '14:00', 'lunch_end': '15:00', 'breaks': []},
+            540,  # 09:00
+            True,
+            False
+        ),
+        (
+            {'work_start': '10:00', 'work_end': '19:00', 'lunch_start': '14:00', 'lunch_end': '15:00', 'breaks': []},
+            1140,  # 19:00
+            False,
+            False
+        ),
+        (
+            {'work_start': '10:00', 'work_end': '19:00', 'lunch_start': '14:00', 'lunch_end': '15:00', 'breaks': []},
+            1141,  # 19:01
+            False,
+            True
+        ),
+    ])
+    @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
+    @patch('activity_simulator.simulation.time_checks.get_state')
+    def test_before_after_work_parametric(self, mock_state, mock_time, schedule, current_time_minutes, expected_before_work, expected_after_work):
+        """Параметрический тест для is_before_work и is_after_work с разными расписаниями"""
+        mock_time.return_value = current_time_minutes
+
+        mock_state_obj = MagicMock()
+        mock_state_obj.schedule = schedule
+        mock_state.return_value = mock_state_obj
+
+        from activity_simulator.simulation.time_checks import is_before_work, is_after_work
+        assert is_before_work() is expected_before_work
+        assert is_after_work() is expected_after_work
