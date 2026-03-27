@@ -19,6 +19,166 @@ from . import listeners
 from . import utils
 
 
+def format_startup_info(state: 'simulation.SimulationState', for_log: bool = False) -> str:
+    """
+    Форматирует информацию о запуске для вывода в консоль или лог.
+
+    Args:
+        state: Экземпляр состояния симуляции
+        for_log: True если форматируется для лога (без emoji)
+
+    Returns:
+        Отформатированная строка с информацией о запуске
+    """
+    lines = []
+
+    if for_log:
+        lines.append("=" * 70)
+        lines.append("ПРОГРАММА СИМУЛЯЦИИ АКТИВНОСТИ ЗАПУЩЕНА")
+        lines.append("=" * 70)
+        lines.append(f"Конфигурация: {config.get_config_filename()}")
+        lines.append("Отслеживание: Мышь + Тачпад + Клавиатура")
+    else:
+        lines.append("=" * 70)
+        lines.append("🚀 ПРОГРАММА СИМУЛЯЦИИ АКТИВНОСТИ ЗАПУЩЕНА")
+        lines.append("=" * 70)
+        lines.append(f"📅 Конфигурация: {config.get_config_filename()}")
+        lines.append("🖱️  Отслеживание: Мышь + Тачпад + Клавиатура")
+
+    lines.append("")
+
+    # Индикатор пятницы
+    day_indicator = " (ПЯТНИЦА - короткий день)" if for_log and state.schedule.get('is_friday', False) else (" 🎉 ПЯТНИЦА!" if state.schedule.get('is_friday', False) else "")
+
+    if for_log:
+        lines.append(f"РАСПИСАНИЕ НА СЕГОДНЯ:{day_indicator}")
+    else:
+        lines.append(f"⏰ РАСПИСАНИЕ НА СЕГОДНЯ:{day_indicator}")
+
+    lunch_duration = utils.time_str_to_minutes(state.schedule['lunch_end']) - utils.time_str_to_minutes(state.schedule['lunch_start'])
+    lines.append(f"  • Рабочее время: {state.schedule['work_start']} - {state.schedule['work_end']}")
+    lines.append(f"  • Обед: {state.schedule['lunch_start']} - {state.schedule['lunch_end']} ({lunch_duration} мин)")
+
+    if state.schedule['breaks']:
+        lines.append(f"  • Перерывы:")
+        for i, brk in enumerate(state.schedule['breaks'], 1):
+            lines.append(f"    {i}. {brk['start']} - {brk['end']} ({brk['duration']} мин)")
+    else:
+        lines.append(f"  • Перерывы: нет")
+
+    lines.append("")
+
+    if for_log:
+        lines.append("ОСНОВНЫЕ ПАРАМЕТРЫ:")
+    else:
+        lines.append("⚙️  ОСНОВНЫЕ ПАРАМЕТРЫ:")
+
+    lines.append(f"  • Порог бездействия: {state.config['min_idle_time']}-{state.config['max_idle_time']} сек")
+    lines.append(f"  • Интервал между действиями: {state.config['min_action_interval']}-{state.config['max_action_interval']} сек")
+    lines.append(f"  • Серия нажатий стрелок: {state.config['min_key_presses']}-{state.config['max_key_presses']} раз")
+    lines.append(f"  • Макс. диапазон мыши: {state.config['max_mouse_range']} пикс")
+
+    lines.append("")
+
+    if for_log:
+        lines.append("ТИПЫ ДЕЙСТВИЙ:")
+    else:
+        lines.append("🎯 ТИПЫ ДЕЙСТВИЙ:")
+
+    lines.append(f"  • Движение мыши: {'✓' if state.config['use_mouse_move'] else '✗'} (вес: {state.config['action_weight_mouse_move']})")
+    lines.append(f"  • Стрелки клавиатуры: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_keyboard']})")
+    lines.append(f"  • Ctrl+Tab: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_ctrl_tab']})")
+    lines.append(f"  • Клики мыши: {'✓' if state.config['use_mouse_click'] else '✗'} (вес: {state.config['action_weight_mouse_click']})")
+    lines.append(f"  • Shift (безопасный): {'✓' if state.config['natural_behavior'] else '✗'} (вес: {state.config['action_weight_safe_key']})")
+    lines.append(f"  • Естественное поведение: {'✓' if state.config['natural_behavior'] else '✗'}")
+
+    lines.append("")
+
+    afterhours_mode_names = {
+        'disabled': '🚫 Отключен',
+        'before_only': '🌅 Только до работы',
+        'before_and_after': '🌅🌙 До и после работы'
+    }
+    if for_log:
+        # Для лога используем более простые обозначения
+        afterhours_log_names = {
+            'disabled': 'Отключен',
+            'before_only': 'Только до работы',
+            'before_and_after': 'До и после работы'
+        }
+        mode_display = afterhours_log_names.get(state.config['afterhours_mode'], state.config['afterhours_mode'])
+    else:
+        mode_display = afterhours_mode_names.get(state.config['afterhours_mode'], state.config['afterhours_mode'])
+
+    if for_log:
+        lines.append(f"ВНЕРАБОЧИЙ РЕЖИМ: {mode_display}")
+    else:
+        lines.append(f"🌙 ВНЕРАБОЧИЙ РЕЖИМ: {mode_display}")
+
+    if state.config['afterhours_mode'] != 'disabled':
+        lines.append(f"  • Всплески активности: {state.config['afterhours_burst_duration_min']}-{state.config['afterhours_burst_duration_max']} сек")
+        lines.append(f"  • Интервал между всплесками: {state.config['afterhours_burst_interval_min']}-{state.config['afterhours_burst_interval_max']} мин")
+
+    lines.append("")
+
+    if for_log:
+        lines.append("ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:")
+    else:
+        lines.append("🍽️ ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:")
+
+    if state.config.get('after_lunch_action', False):
+        env_var_name = state.config.get('after_lunch_sequence', '')
+        if for_log:
+            lines.append(f"  • Переменная окружения: {env_var_name}")
+        else:
+            lines.append(f"  • Переменная окружения: ***")
+        lines.append(f"  • Задержка после обеда: {state.config.get('after_lunch_delay', 5)} сек")
+    else:
+        lines.append(f"  • Ввод последовательности: ✗ (отключено)")
+
+    lines.append("")
+
+    if for_log:
+        lines.append("ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ (Ctrl+C):")
+    else:
+        lines.append("🔌 ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ (Ctrl+C):")
+
+    lines.append(f"  • Действие: Просто завершение программы")
+    lines.append("=" * 70)
+
+    # Текущий статус
+    if simulation.is_work_hours(state):
+        on_break, break_type = simulation.is_break_time(state)
+        if on_break:
+            lines.append(f"Текущий статус: Перерыв ({break_type})")
+        else:
+            lines.append(f"Текущий статус: Рабочее время - активность включена")
+    else:
+        if simulation.should_simulate_afterhours(state):
+            if for_log:
+                time_indicator = "Перед работой" if simulation.is_before_work(state) else "После работы"
+                lines.append(f"Текущий статус: {time_indicator} - режим всплесков активности")
+            else:
+                time_indicator = "🌅 Перед работой" if simulation.is_before_work(state) else "🌙 После работы"
+                lines.append(f"{time_indicator} - режим всплесков активности")
+        else:
+            if for_log:
+                lines.append(f"Текущий статус: Внерабочее время - активность отключена")
+            else:
+                lines.append(f"🌙 Внерабочее время - активность отключена")
+
+    lines.append("")
+    lines.append("Для остановки нажмите Ctrl+C")
+    lines.append("")
+
+    if for_log:
+        lines.append(f"Файл лога: {state.log_file_path}")
+        lines.append(f"Начальная позиция мыши: {state.initial_mouse_position}")
+        lines.append("=" * 70)
+
+    return "\n".join(lines)
+
+
 # Глобальные ссылки на слушатели для корректной очистки
 _keyboard_listener: Optional[keyboard.Listener] = None
 _mouse_listener: Optional[mouse.Listener] = None
@@ -80,175 +240,12 @@ def main() -> None:
     state.initial_mouse_position = simulation.get_mouse_controller().position
 
     # === ВЫВОД ИНФОРМАЦИИ ===
-    print("=" * 70)
-    print("🚀 ПРОГРАММА СИМУЛЯЦИИ АКТИВНОСТИ ЗАПУЩЕНА")
-    print("=" * 70)
-    print(f"📅 Конфигурация: {config.get_config_filename()}")
-    print(f"🖱️  Отслеживание: Мышь + Тачпад + Клавиатура")
-    print()
+    print(format_startup_info(state, for_log=False))
 
-    # Индикатор пятницы
-    day_indicator = ""
-    if state.schedule.get('is_friday', False):
-        day_indicator = " 🎉 ПЯТНИЦА!"
-
-    print(f"⏰ РАСПИСАНИЕ НА СЕГОДНЯ:{day_indicator}")
-    print(f"  • Рабочее время: {state.schedule['work_start']} - {state.schedule['work_end']}")
-    print(f"  • Обед: {state.schedule['lunch_start']} - {state.schedule['lunch_end']} " +
-          f"({utils.time_str_to_minutes(state.schedule['lunch_end']) - utils.time_str_to_minutes(state.schedule['lunch_start'])} мин)")
-
-    if state.schedule['breaks']:
-        print(f"  • Перерывы:")
-        for i, brk in enumerate(state.schedule['breaks'], 1):
-            print(f"    {i}. {brk['start']} - {brk['end']} ({brk['duration']} мин)")
-    else:
-        print(f"  • Перерывы: нет")
-
-    print()
-    print(f"⚙️  ОСНОВНЫЕ ПАРАМЕТРЫ:")
-    print(f"  • Порог бездействия: {state.config['min_idle_time']}-{state.config['max_idle_time']} сек")
-    print(f"  • Интервал между действиями: {state.config['min_action_interval']}-{state.config['max_action_interval']} сек")
-    print(f"  • Серия нажатий стрелок: {state.config['min_key_presses']}-{state.config['max_key_presses']} раз")
-    print(f"  • Макс. диапазон мыши: {state.config['max_mouse_range']} пикс")
-
-    print()
-    print(f"🎯 ТИПЫ ДЕЙСТВИЙ:")
-    print(f"  • Движение мыши: {'✓' if state.config['use_mouse_move'] else '✗'} (вес: {state.config['action_weight_mouse_move']})")
-    print(f"  • Стрелки клавиатуры: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_keyboard']})")
-    print(f"  • Ctrl+Tab: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_ctrl_tab']})")
-    print(f"  • Клики мыши: {'✓' if state.config['use_mouse_click'] else '✗'} (вес: {state.config['action_weight_mouse_click']})")
-    print(f"  • Shift (безопасный): {'✓' if state.config['natural_behavior'] else '✗'} (вес: {state.config['action_weight_safe_key']})")
-    print(f"  • Естественное поведение: {'✓' if state.config['natural_behavior'] else '✗'}")
-
-    print()
-    afterhours_mode_names = {
-        'disabled': '🚫 Отключен',
-        'before_only': '🌅 Только до работы',
-        'before_and_after': '🌅🌙 До и после работы'
-    }
-    print(f"🌙 ВНЕРАБОЧИЙ РЕЖИМ: {afterhours_mode_names.get(state.config['afterhours_mode'], state.config['afterhours_mode'])}")
-    if state.config['afterhours_mode'] != 'disabled':
-        print(f"  • Всплески активности: {state.config['afterhours_burst_duration_min']}-{state.config['afterhours_burst_duration_max']} сек")
-        print(f"  • Интервал между всплесками: {state.config['afterhours_burst_interval_min']}-{state.config['afterhours_burst_interval_max']} мин")
-
-    print()
-    print(f"🍽️ ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:")
-    if state.config.get('after_lunch_action', False):
-        # Имя переменной окружения не выводим для безопасности
-        print(f"  • Переменная окружения: ***")
-        print(f"  • Задержка после обеда: {state.config.get('after_lunch_delay', 5)} сек")
-    else:
-        print(f"  • Ввод последовательности: ✗ (отключено)")
-
-    print()
-    print(f"🔌 ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ (Ctrl+C):")
-    print(f"  • Действие: Просто завершение программы")
-
-    print("=" * 70)
-
-    # Проверяем текущий статус
-    if simulation.is_work_hours(state):
-        on_break, break_type = simulation.is_break_time(state)
-        if on_break:
-            print(f"☕ Текущий статус: Перерыв ({break_type})")
-        else:
-            print(f"💼 Текущий статус: Рабочее время - активность включена")
-    else:
-        if simulation.should_simulate_afterhours(state):
-            time_indicator = "🌅 Перед работой" if simulation.is_before_work(state) else "🌙 После работы"
-            print(f"{time_indicator} - режим всплесков активности")
-        else:
-            print(f"🌙 Внерабочее время - активность отключена")
-
-    print()
-    print("Для остановки нажмите Ctrl+C")
-    print()
-
-    # === СОХРАНЕНИЕ ИНФОРМАЦИОННОЙ ЧАСТИ В ЛОГ ===
+    # === СОХРАНЕНИЕ ИНФОРМАЦИИ В ЛОГ ===
     if state.config['verbose_logging']:
-        simulation.log("=" * 70, state=state)
-        simulation.log("ПРОГРАММА СИМУЛЯЦИИ АКТИВНОСТИ ЗАПУЩЕНА", state=state)
-        simulation.log("=" * 70, state=state)
-        simulation.log(f"Конфигурация: {config.get_config_filename()}", state=state)
-        simulation.log(f"Отслеживание: Мышь + Тачпад + Клавиатура", state=state)
-        simulation.log("", state=state)
-
-        day_log_indicator = ""
-        if state.schedule.get('is_friday', False):
-            day_log_indicator = " (ПЯТНИЦА - короткий день)"
-
-        simulation.log(f"РАСПИСАНИЕ НА СЕГОДНЯ:{day_log_indicator}", state=state)
-        simulation.log(f"  • Рабочее время: {state.schedule['work_start']} - {state.schedule['work_end']}", state=state)
-        simulation.log(f"  • Обед: {state.schedule['lunch_start']} - {state.schedule['lunch_end']} " +
-                      f"({utils.time_str_to_minutes(state.schedule['lunch_end']) - utils.time_str_to_minutes(state.schedule['lunch_start'])} мин)", state=state)
-
-        if state.schedule['breaks']:
-            simulation.log(f"  • Перерывы:", state=state)
-            for i, brk in enumerate(state.schedule['breaks'], 1):
-                simulation.log(f"    {i}. {brk['start']} - {brk['end']} ({brk['duration']} мин)", state=state)
-        else:
-            simulation.log(f"  • Перерывы: нет", state=state)
-
-        simulation.log("", state=state)
-        simulation.log("ОСНОВНЫЕ ПАРАМЕТРЫ:", state=state)
-        simulation.log(f"  • Порог бездействия: {state.config['min_idle_time']}-{state.config['max_idle_time']} сек", state=state)
-        simulation.log(f"  • Интервал между действиями: {state.config['min_action_interval']}-{state.config['max_action_interval']} сек", state=state)
-        simulation.log(f"  • Серия нажатий стрелок: {state.config['min_key_presses']}-{state.config['max_key_presses']} раз", state=state)
-        simulation.log(f"  • Макс. диапазон мыши: {state.config['max_mouse_range']} пикс", state=state)
-
-        simulation.log("", state=state)
-        simulation.log("ТИПЫ ДЕЙСТВИЙ:", state=state)
-        simulation.log(f"  • Движение мыши: {'✓' if state.config['use_mouse_move'] else '✗'} (вес: {state.config['action_weight_mouse_move']})", state=state)
-        simulation.log(f"  • Стрелки клавиатуры: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_keyboard']})", state=state)
-        simulation.log(f"  • Ctrl+Tab: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_ctrl_tab']})", state=state)
-        simulation.log(f"  • Клики мыши: {'✓' if state.config['use_mouse_click'] else '✗'} (вес: {state.config['action_weight_mouse_click']})", state=state)
-        simulation.log(f"  • Shift (безопасный): {'✓' if state.config['natural_behavior'] else '✗'} (вес: {state.config['action_weight_safe_key']})", state=state)
-        simulation.log(f"  • Естественное поведение: {'✓' if state.config['natural_behavior'] else '✗'}", state=state)
-
-        simulation.log("", state=state)
-        afterhours_mode_names = {
-            'disabled': '🚫 Отключен',
-            'before_only': '🌅 Только до работы',
-            'before_and_after': '🌅🌙 До и после работы'
-        }
-        simulation.log(f"ВНЕРАБОЧИЙ РЕЖИМ: {afterhours_mode_names.get(state.config['afterhours_mode'], state.config['afterhours_mode'])}", state=state)
-        if state.config['afterhours_mode'] != 'disabled':
-            simulation.log(f"  • Всплески активности: {state.config['afterhours_burst_duration_min']}-{state.config['afterhours_burst_duration_max']} сек", state=state)
-            simulation.log(f"  • Интервал между всплесками: {state.config['afterhours_burst_interval_min']}-{state.config['afterhours_burst_interval_max']} мин", state=state)
-
-        simulation.log("", state=state)
-        simulation.log("ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:", state=state)
-        if state.config.get('after_lunch_action', False):
-            env_var_name = state.config.get('after_lunch_sequence', '')
-            simulation.log(f"  • Переменная окружения: {env_var_name}", state=state)
-            simulation.log(f"  • Задержка после обеда: {state.config.get('after_lunch_delay', 5)} сек", state=state)
-        else:
-            simulation.log(f"  • Ввод последовательности: ✗ (отключено)", state=state)
-
-        simulation.log("", state=state)
-        simulation.log("ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ (Ctrl+C):", state=state)
-        simulation.log(f"  • Действие: Просто завершение программы", state=state)
-
-        simulation.log("=" * 70, state=state)
-
-        # Текущий статус
-        if simulation.is_work_hours(state):
-            on_break, break_type = simulation.is_break_time(state)
-            if on_break:
-                simulation.log(f"Текущий статус: Перерыв ({break_type})", state=state)
-            else:
-                simulation.log(f"Текущий статус: Рабочее время - активность включена", state=state)
-        else:
-            if simulation.should_simulate_afterhours(state):
-                time_indicator = "Перед работой" if simulation.is_before_work(state) else "После работы"
-                simulation.log(f"Текущий статус: {time_indicator} - режим всплесков активности", state=state)
-            else:
-                simulation.log(f"Текущий статус: Внерабочее время - активность отключена", state=state)
-
-        simulation.log("", state=state)
-        simulation.log(f"Файл лога: {state.log_file_path}", state=state)
-        simulation.log(f"Начальная позиция мыши: {state.initial_mouse_position}", state=state)
-        simulation.log("=" * 70, state=state)
+        for line in format_startup_info(state, for_log=True).split('\n'):
+            simulation.log(line, state=state)
 
     # === ЗАПУСК ПОТОКОВ СИМУЛЯЦИИ ===
     # Запускаем потоки только после вывода всей информации
