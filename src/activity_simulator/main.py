@@ -19,41 +19,86 @@ from . import listeners
 from . import utils
 
 
-def format_startup_info(state: 'simulation.SimulationState', for_log: bool = False) -> str:
-    """
-    Форматирует информацию о запуске для вывода в консоль или лог.
+# === Словари префиксов для разных режимов вывода ===
 
-    Args:
-        state: Экземпляр состояния симуляции
-        for_log: True если форматируется для лога (без emoji)
+_PREFIX_CONSOLE = {
+    'header': '🚀',
+    'config': '📅',
+    'tracking': '🖱️ ',
+    'schedule': '⏰',
+    'params': '⚙️ ',
+    'actions': '🎯',
+    'afterhours': '🌙',
+    'after_lunch': '🍽️',
+    'shutdown': '🔌',
+    'friday': ' 🎉 ПЯТНИЦА!',
+    'before_work': '🌅 Перед работой',
+    'after_work': '🌙 После работы',
+    'disabled_afterhours': '🚫 Отключен',
+    'before_only': '🌅 Только до работы',
+    'before_and_after': '🌅🌙 До и после работы',
+    'disabled_worktime': '🌙 Внерабочее время - активность отключена',
+}
 
-    Returns:
-        Отформатированная строка с информацией о запуске
-    """
+_PREFIX_LOG = {
+    'header': '',
+    'config': '',
+    'tracking': '',
+    'schedule': '',
+    'params': '',
+    'actions': '',
+    'afterhours': '',
+    'after_lunch': '',
+    'shutdown': '',
+    'friday': ' (ПЯТНИЦА - короткий день)',
+    'before_work': 'Перед работой',
+    'after_work': 'После работы',
+    'disabled_afterhours': 'Отключен',
+    'before_only': 'Только до работы',
+    'before_and_after': 'До и после работы',
+    'disabled_worktime': 'Внерабочее время - активность отключена',
+}
+
+_AFTERHOURS_MODE_DISPLAY = {
+    'disabled': ('Отключен', '🚫 Отключен'),
+    'before_only': ('Только до работы', '🌅 Только до работы'),
+    'before_and_after': ('До и после работы', '🌅🌙 До и после работы'),
+}
+
+
+def _get_prefixes(for_log: bool) -> dict:
+    """Возвращает словарь префиксов в зависимости от режима вывода"""
+    return _PREFIX_LOG if for_log else _PREFIX_CONSOLE
+
+
+def _format_header(prefixes: dict, state: 'simulation.SimulationState') -> list[str]:
+    """Форматирует заголовок"""
     lines = []
+    header_prefix = prefixes['header']
+    config_prefix = prefixes['config']
+    tracking_prefix = prefixes['tracking']
 
-    if for_log:
-        lines.append("=" * 70)
+    lines.append("=" * 70)
+    header = f"{header_prefix} ПРОГРАММА СИМУЛЯЦИИ АКТИВНОСТИ ЗАПУЩЕНА"
+    if header_prefix:
+        lines.append(header)
+    else:
         lines.append("ПРОГРАММА СИМУЛЯЦИИ АКТИВНОСТИ ЗАПУЩЕНА")
-        lines.append("=" * 70)
-        lines.append(f"Конфигурация: {config.get_config_filename()}")
-        lines.append("Отслеживание: Мышь + Тачпад + Клавиатура")
-    else:
-        lines.append("=" * 70)
-        lines.append("🚀 ПРОГРАММА СИМУЛЯЦИИ АКТИВНОСТИ ЗАПУЩЕНА")
-        lines.append("=" * 70)
-        lines.append(f"📅 Конфигурация: {config.get_config_filename()}")
-        lines.append("🖱️  Отслеживание: Мышь + Тачпад + Клавиатура")
-
+    lines.append("=" * 70)
+    lines.append(f"{config_prefix} Конфигурация: {config.get_config_filename()}")
+    lines.append(f"{tracking_prefix} Отслеживание: Мышь + Тачпад + Клавиатура")
     lines.append("")
+    return lines
 
-    # Индикатор пятницы
-    day_indicator = " (ПЯТНИЦА - короткий день)" if for_log and state.schedule.get('is_friday', False) else (" 🎉 ПЯТНИЦА!" if state.schedule.get('is_friday', False) else "")
 
-    if for_log:
-        lines.append(f"РАСПИСАНИЕ НА СЕГОДНЯ:{day_indicator}")
-    else:
-        lines.append(f"⏰ РАСПИСАНИЕ НА СЕГОДНЯ:{day_indicator}")
+def _format_schedule_info(prefixes: dict, state: 'simulation.SimulationState') -> list[str]:
+    """Форматирует информацию о расписании"""
+    lines = []
+    schedule_prefix = prefixes['schedule']
+    friday_indicator = prefixes['friday']
+
+    day_indicator = friday_indicator if state.schedule.get('is_friday', False) else ""
+    lines.append(f"{schedule_prefix} РАСПИСАНИЕ НА СЕГОДНЯ:{day_indicator}")
 
     lunch_duration = utils.time_str_to_minutes(state.schedule['lunch_end']) - utils.time_str_to_minutes(state.schedule['lunch_start'])
     lines.append(f"  • Рабочее время: {state.schedule['work_start']} - {state.schedule['work_end']}")
@@ -67,82 +112,86 @@ def format_startup_info(state: 'simulation.SimulationState', for_log: bool = Fal
         lines.append(f"  • Перерывы: нет")
 
     lines.append("")
+    return lines
 
-    if for_log:
-        lines.append("ОСНОВНЫЕ ПАРАМЕТРЫ:")
-    else:
-        lines.append("⚙️  ОСНОВНЫЕ ПАРАМЕТРЫ:")
 
+def _format_params_info(prefixes: dict, state: 'simulation.SimulationState') -> list[str]:
+    """Форматирует основные параметры"""
+    lines = []
+    params_prefix = prefixes['params']
+
+    lines.append(f"{params_prefix} ОСНОВНЫЕ ПАРАМЕТРЫ:")
     lines.append(f"  • Порог бездействия: {state.config['min_idle_time']}-{state.config['max_idle_time']} сек")
     lines.append(f"  • Интервал между действиями: {state.config['min_action_interval']}-{state.config['max_action_interval']} сек")
     lines.append(f"  • Серия нажатий стрелок: {state.config['min_key_presses']}-{state.config['max_key_presses']} раз")
     lines.append(f"  • Макс. диапазон мыши: {state.config['max_mouse_range']} пикс")
-
     lines.append("")
+    return lines
 
-    if for_log:
-        lines.append("ТИПЫ ДЕЙСТВИЙ:")
-    else:
-        lines.append("🎯 ТИПЫ ДЕЙСТВИЙ:")
 
+def _format_actions_info(prefixes: dict, state: 'simulation.SimulationState') -> list[str]:
+    """Форматирует информацию о типах действий"""
+    lines = []
+    actions_prefix = prefixes['actions']
+
+    lines.append(f"{actions_prefix} ТИПЫ ДЕЙСТВИЙ:")
     lines.append(f"  • Движение мыши: {'✓' if state.config['use_mouse_move'] else '✗'} (вес: {state.config['action_weight_mouse_move']})")
     lines.append(f"  • Стрелки клавиатуры: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_keyboard']})")
     lines.append(f"  • Ctrl+Tab: {'✓' if state.config['use_keyboard'] else '✗'} (вес: {state.config['action_weight_ctrl_tab']})")
     lines.append(f"  • Клики мыши: {'✓' if state.config['use_mouse_click'] else '✗'} (вес: {state.config['action_weight_mouse_click']})")
     lines.append(f"  • Shift (безопасный): {'✓' if state.config['natural_behavior'] else '✗'} (вес: {state.config['action_weight_safe_key']})")
     lines.append(f"  • Естественное поведение: {'✓' if state.config['natural_behavior'] else '✗'}")
-
     lines.append("")
+    return lines
 
-    afterhours_mode_names = {
-        'disabled': '🚫 Отключен',
-        'before_only': '🌅 Только до работы',
-        'before_and_after': '🌅🌙 До и после работы'
-    }
-    if for_log:
-        # Для лога используем более простые обозначения
-        afterhours_log_names = {
-            'disabled': 'Отключен',
-            'before_only': 'Только до работы',
-            'before_and_after': 'До и после работы'
-        }
-        mode_display = afterhours_log_names.get(state.config['afterhours_mode'], state.config['afterhours_mode'])
-    else:
-        mode_display = afterhours_mode_names.get(state.config['afterhours_mode'], state.config['afterhours_mode'])
 
-    if for_log:
-        lines.append(f"ВНЕРАБОЧИЙ РЕЖИМ: {mode_display}")
-    else:
-        lines.append(f"🌙 ВНЕРАБОЧИЙ РЕЖИМ: {mode_display}")
+def _format_afterhours_info(prefixes: dict, state: 'simulation.SimulationState') -> list[str]:
+    """Форматирует информацию о внерабочем режиме"""
+    lines = []
+    afterhours_prefix = prefixes['afterhours']
 
-    if state.config['afterhours_mode'] != 'disabled':
+    mode = state.config['afterhours_mode']
+    mode_display = _AFTERHOURS_MODE_DISPLAY.get(mode, (mode, mode))[1 if prefixes.get('friday') == ' 🎉 ПЯТНИЦА!' else 0]
+    lines.append(f"{afterhours_prefix} ВНЕРАБОЧИЙ РЕЖИМ: {mode_display}")
+
+    if mode != 'disabled':
         lines.append(f"  • Всплески активности: {state.config['afterhours_burst_duration_min']}-{state.config['afterhours_burst_duration_max']} сек")
         lines.append(f"  • Интервал между всплесками: {state.config['afterhours_burst_interval_min']}-{state.config['afterhours_burst_interval_max']} мин")
 
     lines.append("")
+    return lines
 
-    if for_log:
-        lines.append("ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:")
-    else:
-        lines.append("🍽️ ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:")
 
+def _format_after_lunch_info(prefixes: dict, state: 'simulation.SimulationState') -> list[str]:
+    """Форматирует информацию о действиях после обеда"""
+    lines = []
+    after_lunch_prefix = prefixes['after_lunch']
+
+    lines.append(f"{after_lunch_prefix} ДЕЙСТВИЯ ПОСЛЕ ОБЕДА:")
     if state.config.get('after_lunch_action', False):
         lines.append(f"  • Переменная окружения: ***")
         lines.append(f"  • Задержка после обеда: {state.config.get('after_lunch_delay', 5)} сек")
     else:
         lines.append(f"  • Ввод последовательности: ✗ (отключено)")
-
     lines.append("")
+    return lines
 
-    if for_log:
-        lines.append("ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ (Ctrl+C):")
-    else:
-        lines.append("🔌 ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ (Ctrl+C):")
 
+def _format_shutdown_info(prefixes: dict) -> list[str]:
+    """Форматирует информацию о завершении программы"""
+    lines = []
+    shutdown_prefix = prefixes['shutdown']
+
+    lines.append(f"{shutdown_prefix} ПРИ ЗАВЕРШЕНИИ ПРОГРАММЫ (Ctrl+C):")
     lines.append(f"  • Действие: Просто завершение программы")
     lines.append("=" * 70)
+    return lines
 
-    # Текущий статус
+
+def _format_current_status(prefixes: dict, state: 'simulation.SimulationState') -> list[str]:
+    """Форматирует текущий статус"""
+    lines = []
+
     if simulation.is_work_hours(state):
         on_break, break_type = simulation.is_break_time(state)
         if on_break:
@@ -151,26 +200,54 @@ def format_startup_info(state: 'simulation.SimulationState', for_log: bool = Fal
             lines.append(f"Текущий статус: Рабочее время - активность включена")
     else:
         if simulation.should_simulate_afterhours(state):
-            if for_log:
-                time_indicator = "Перед работой" if simulation.is_before_work(state) else "После работы"
-                lines.append(f"Текущий статус: {time_indicator} - режим всплесков активности")
+            if simulation.is_before_work(state):
+                time_indicator = prefixes['before_work']
             else:
-                time_indicator = "🌅 Перед работой" if simulation.is_before_work(state) else "🌙 После работы"
-                lines.append(f"{time_indicator} - режим всплесков активности")
+                time_indicator = prefixes['after_work']
+            lines.append(f"{time_indicator} - режим всплесков активности")
         else:
-            if for_log:
-                lines.append(f"Текущий статус: Внерабочее время - активность отключена")
-            else:
-                lines.append(f"🌙 Внерабочее время - активность отключена")
+            lines.append(f"{prefixes['disabled_worktime']}")
 
     lines.append("")
     lines.append("Для остановки нажмите Ctrl+C")
     lines.append("")
+    return lines
+
+
+def _format_log_suffix(state: 'simulation.SimulationState') -> list[str]:
+    """Форматирует суффикс для лога (файл лога и позиция мыши)"""
+    lines = []
+    lines.append(f"Файл лога: {state.log_file_path}")
+    lines.append(f"Начальная позиция мыши: {state.initial_mouse_position}")
+    lines.append("=" * 70)
+    return lines
+
+
+def format_startup_info(state: 'simulation.SimulationState', for_log: bool = False) -> str:
+    """
+    Форматирует информацию о запуске для вывода в консоль или лог.
+
+    Args:
+        state: Экземпляр состояния симуляции
+        for_log: True если форматируется для лога (без emoji)
+
+    Returns:
+        Отформатированная строка с информацией о запуске
+    """
+    prefixes = _get_prefixes(for_log)
+    lines = []
+
+    lines.extend(_format_header(prefixes, state))
+    lines.extend(_format_schedule_info(prefixes, state))
+    lines.extend(_format_params_info(prefixes, state))
+    lines.extend(_format_actions_info(prefixes, state))
+    lines.extend(_format_afterhours_info(prefixes, state))
+    lines.extend(_format_after_lunch_info(prefixes, state))
+    lines.extend(_format_shutdown_info(prefixes))
+    lines.extend(_format_current_status(prefixes, state))
 
     if for_log:
-        lines.append(f"Файл лога: {state.log_file_path}")
-        lines.append(f"Начальная позиция мыши: {state.initial_mouse_position}")
-        lines.append("=" * 70)
+        lines.extend(_format_log_suffix(state))
 
     return "\n".join(lines)
 
