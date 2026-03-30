@@ -6,7 +6,7 @@
 """
 
 from typing import Optional, Tuple, TYPE_CHECKING
-from threading import Lock
+from threading import RLock
 from collections import deque
 
 if TYPE_CHECKING:
@@ -72,7 +72,8 @@ class SimulationState:
     Инкапсулирует глобальное состояние симуляции.
 
     Обеспечивает потокобезопасный доступ к общим переменным через
-    методы с блокировкой, вместо прямого обращения к глобальным переменным.
+    свойства с встроенной блокировкой. Использует RLock для поддержки
+    вложенных захватов из того же потока.
     """
 
     # Контроллеры ввода (ссылки на глобальные) - строковые аннотации для избежания импорта при загрузке
@@ -81,7 +82,7 @@ class SimulationState:
 
     def __init__(self) -> None:
         """Инициализирует состояние симуляции с начальными значениями."""
-        self._lock: Lock = Lock()
+        self._lock: RLock = RLock()
         self._last_activity_time: float = 0.0
         self._initial_mouse_position: Tuple[int, int] = (0, 0)
         self._absolute_anchor_position: Optional[Tuple[int, int]] = None
@@ -103,147 +104,177 @@ class SimulationState:
     # === Свойства для доступа к состоянию ===
 
     @property
-    def lock(self) -> Lock:
+    def lock(self) -> RLock:
         """Возвращает блокировку для внешнего использования (например, в контекстных менеджерах)."""
         return self._lock
 
     @property
     def last_activity_time(self) -> float:
         """Время последней активности пользователя."""
-        return self._last_activity_time
+        with self._lock:
+            return self._last_activity_time
 
     @last_activity_time.setter
     def last_activity_time(self, value: float) -> None:
-        self._last_activity_time = value
+        with self._lock:
+            self._last_activity_time = value
 
     @property
     def initial_mouse_position(self) -> Tuple[int, int]:
         """Начальная позиция мыши."""
-        return self._initial_mouse_position
+        with self._lock:
+            return self._initial_mouse_position
 
     @initial_mouse_position.setter
     def initial_mouse_position(self, value: Tuple[int, int]) -> None:
-        self._initial_mouse_position = value
+        with self._lock:
+            self._initial_mouse_position = value
 
     @property
     def absolute_anchor_position(self) -> Optional[Tuple[int, int]]:
         """Референсная точка для ограничений движения мыши."""
-        return self._absolute_anchor_position
+        with self._lock:
+            return self._absolute_anchor_position
 
     @absolute_anchor_position.setter
     def absolute_anchor_position(self, value: Optional[Tuple[int, int]]) -> None:
-        self._absolute_anchor_position = value
+        with self._lock:
+            self._absolute_anchor_position = value
 
     @property
     def is_simulating(self) -> bool:
         """Флаг, указывающий, что симуляция активна."""
-        return self._is_simulating
+        with self._lock:
+            return self._is_simulating
 
     @is_simulating.setter
     def is_simulating(self, value: bool) -> None:
-        self._is_simulating = value
+        with self._lock:
+            self._is_simulating = value
 
     @property
     def is_performing_action(self) -> bool:
         """Флаг, указывающий, что действие выполняется."""
-        return self._is_performing_action
+        with self._lock:
+            return self._is_performing_action
 
     @is_performing_action.setter
     def is_performing_action(self, value: bool) -> None:
-        self._is_performing_action = value
+        with self._lock:
+            self._is_performing_action = value
 
     @property
     def action_history(self) -> deque[Tuple[str, float]]:
         """История выполненных действий."""
-        return self._action_history
+        with self._lock:
+            return self._action_history
 
     @property
     def log_file_path(self) -> str:
         """Путь к файлу лога."""
-        return self._log_file_path
+        with self._lock:
+            return self._log_file_path
 
     @log_file_path.setter
     def log_file_path(self, value: str) -> None:
-        self._log_file_path = value
+        with self._lock:
+            self._log_file_path = value
 
     @property
     def current_idle_threshold(self) -> Optional[float]:
         """Текущий порог бездействия."""
-        return self._current_idle_threshold
+        with self._lock:
+            return self._current_idle_threshold
 
     @current_idle_threshold.setter
     def current_idle_threshold(self, value: Optional[float]) -> None:
-        self._current_idle_threshold = value
+        with self._lock:
+            self._current_idle_threshold = value
 
     @property
     def last_mouse_log_time(self) -> float:
         """Время последнего лога движения мыши."""
-        return self._last_mouse_log_time
+        with self._lock:
+            return self._last_mouse_log_time
 
     @last_mouse_log_time.setter
     def last_mouse_log_time(self, value: float) -> None:
-        self._last_mouse_log_time = value
+        with self._lock:
+            self._last_mouse_log_time = value
 
     @property
     def lunch_sequence_executed(self) -> bool:
         """Флаг выполнения последовательности после обеда."""
-        return self._lunch_sequence_executed
+        with self._lock:
+            return self._lunch_sequence_executed
 
     @lunch_sequence_executed.setter
     def lunch_sequence_executed(self, value: bool) -> None:
-        self._lunch_sequence_executed = value
+        with self._lock:
+            self._lunch_sequence_executed = value
 
     @property
     def shutdown_cancelled(self) -> bool:
         """Флаг отмены выключения."""
-        return self._shutdown_cancelled
+        with self._lock:
+            return self._shutdown_cancelled
 
     @shutdown_cancelled.setter
     def shutdown_cancelled(self, value: bool) -> None:
-        self._shutdown_cancelled = value
+        with self._lock:
+            self._shutdown_cancelled = value
 
     @property
     def user_activity_after_work(self) -> bool:
         """Флаг активности пользователя после работы."""
-        return self._user_activity_after_work
+        with self._lock:
+            return self._user_activity_after_work
 
     @user_activity_after_work.setter
     def user_activity_after_work(self, value: bool) -> None:
-        self._user_activity_after_work = value
+        with self._lock:
+            self._user_activity_after_work = value
 
     @property
     def simulation_finished(self) -> bool:
         """Флаг завершения симуляции."""
-        return self._simulation_finished
+        with self._lock:
+            return self._simulation_finished
 
     @simulation_finished.setter
     def simulation_finished(self, value: bool) -> None:
-        self._simulation_finished = value
+        with self._lock:
+            self._simulation_finished = value
 
     @property
     def last_break_burst_time(self) -> Optional[float]:
         """Время последнего всплеска во время перерыва."""
-        return self._last_break_burst_time
+        with self._lock:
+            return self._last_break_burst_time
 
     @last_break_burst_time.setter
     def last_break_burst_time(self, value: Optional[float]) -> None:
-        self._last_break_burst_time = value
+        with self._lock:
+            self._last_break_burst_time = value
 
     @property
     def program_start_time(self) -> float:
         """Время запуска программы."""
-        return self._program_start_time
+        with self._lock:
+            return self._program_start_time
 
     @program_start_time.setter
     def program_start_time(self, value: float) -> None:
-        self._program_start_time = value
+        with self._lock:
+            self._program_start_time = value
 
     # === Методы для работы с конфигурацией и расписанием ===
 
     @property
     def config(self) -> dict:
         """Конфигурация программы (только для чтения после инициализации)."""
-        return self._config
+        with self._lock:
+            return self._config
 
     def set_config(self, config: dict) -> None:
         """Устанавливает конфигурацию (вызывается один раз при запуске)."""
@@ -253,7 +284,8 @@ class SimulationState:
     @property
     def schedule(self) -> dict:
         """Расписание рабочего дня (только для чтения после инициализации)."""
-        return self._schedule
+        with self._lock:
+            return self._schedule
 
     def set_schedule(self, schedule: dict) -> None:
         """Устанавливает расписание (вызывается один раз при запуске)."""
