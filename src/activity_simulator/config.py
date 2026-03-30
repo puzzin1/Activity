@@ -9,6 +9,8 @@ import random
 import os
 from datetime import datetime
 
+from .utils import time_str_to_minutes
+
 # Попытка импорта YAML
 try:
     import yaml  # type: ignore
@@ -465,24 +467,6 @@ def get_config_filename() -> str:
         str: Имя файла в формате 'activity_config_YYYYMMDD.json'
     """
     return f"activity_config_{datetime.now().strftime('%Y%m%d')}.json"
-
-
-def time_str_to_minutes(time_str: str) -> int:
-    """
-    Конвертирует строку времени 'HH:MM' в минуты с начала дня.
-
-    Args:
-        time_str (str): Время в формате 'HH:MM'
-
-    Returns:
-        int: Количество минут с начала дня (0-1439)
-
-    Example:
-        time_str_to_minutes('09:30') -> 570
-        time_str_to_minutes('14:15') -> 855
-    """
-    h, m = map(int, time_str.split(':'))
-    return h * 60 + m
 
 
 def minutes_to_time_str(minutes: int) -> str:
