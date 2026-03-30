@@ -129,15 +129,15 @@ def lock_computer() -> Tuple[bool, str]:
             try:
                 # Попытка 1: gnome-screensaver
                 subprocess.call(['gnome-screensaver-command', '--lock'])
-            except:
+            except Exception:
                 try:
                     # Попытка 2: xdg-screensaver
                     subprocess.call(['xdg-screensaver', 'lock'])
-                except:
+                except Exception:
                     try:
                         # Попытка 3: loginctl
                         subprocess.call(['loginctl', 'lock-session'])
-                    except:
+                    except Exception:
                         return False, "⚠️ Не удалось заблокировать компьютер (Linux)"
             return True, "🔒 Компьютер заблокирован (Linux)"
         else:
@@ -168,10 +168,10 @@ def shutdown_computer() -> Tuple[bool, str]:
             # Linux: принудительное выключение
             try:
                 subprocess.call(['systemctl', 'poweroff'])
-            except:
+            except Exception:
                 try:
                     subprocess.call(['shutdown', '-h', 'now'])
-                except:
+                except Exception:
                     return False, "⚠️ Не удалось выключить компьютер (Linux)"
             return True, "🔌 Компьютер выключается (Linux)"
         else:

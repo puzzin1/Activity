@@ -189,14 +189,14 @@ def show_shutdown_warning(state: Optional['SimulationState'] = None) -> bool:
         if timer is not None:
             try:
                 timer.cancel()
-            except:
+            except Exception:
                 pass
         root.destroy()
 
     def on_timeout() -> None:
         try:
             root.destroy()
-        except:
+        except Exception:
             pass
 
     # Создаем окно
