@@ -95,7 +95,8 @@ class SimulationState:
         self._shutdown_cancelled: bool = False
         self._user_activity_after_work: bool = False
         self._simulation_finished: bool = False
-        self._last_break_burst_time: Optional[float] = None
+        self._last_break_burst_time: float = 0.0
+        self._last_afterhours_burst_time: float = 0.0
         self._log_file_path: str = ""
         self._config: dict = {}
         self._schedule: dict = {}
@@ -247,15 +248,26 @@ class SimulationState:
             self._simulation_finished = value
 
     @property
-    def last_break_burst_time(self) -> Optional[float]:
+    def last_break_burst_time(self) -> float:
         """Время последнего всплеска во время перерыва."""
         with self._lock:
             return self._last_break_burst_time
 
     @last_break_burst_time.setter
-    def last_break_burst_time(self, value: Optional[float]) -> None:
+    def last_break_burst_time(self, value: float) -> None:
         with self._lock:
             self._last_break_burst_time = value
+
+    @property
+    def last_afterhours_burst_time(self) -> float:
+        """Время последнего всплеска внерабочего режима."""
+        with self._lock:
+            return self._last_afterhours_burst_time
+
+    @last_afterhours_burst_time.setter
+    def last_afterhours_burst_time(self, value: float) -> None:
+        with self._lock:
+            self._last_afterhours_burst_time = value
 
     @property
     def program_start_time(self) -> float:

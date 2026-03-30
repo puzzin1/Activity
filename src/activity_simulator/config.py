@@ -454,6 +454,39 @@ def ensure_config_keys(config: Dict[str, Any]) -> Dict[str, Any]:
     return config
 
 
+# Пары (min_key, max_key, описание) для валидации
+_CONFIG_RANGE_PAIRS: List[Tuple[str, str, str]] = [
+    ('min_idle_time', 'max_idle_time', 'Время бездействия'),
+    ('min_action_interval', 'max_action_interval', 'Интервал действий'),
+    ('min_key_presses', 'max_key_presses', 'Количество нажатий клавиш'),
+    ('afterhours_burst_interval_min', 'afterhours_burst_interval_max', 'Интервал всплесков'),
+    ('afterhours_burst_duration_min', 'afterhours_burst_duration_max', 'Продолжительность всплесков'),
+]
+
+
+def validate_config_ranges(config: Dict[str, Any]) -> List[str]:
+    """
+    Проверяет, что min-значения не превышают max-значения в конфигурации.
+
+    Args:
+        config: Словарь конфигурации
+
+    Returns:
+        list: Список предупреждений (пустой если всё корректно)
+    """
+    warnings: List[str] = []
+    for min_key, max_key, description in _CONFIG_RANGE_PAIRS:
+        min_val = config.get(min_key)
+        max_val = config.get(max_key)
+        if min_val is not None and max_val is not None and min_val > max_val:
+            warnings.append(
+                f"⚠️ {description}: {min_key}={min_val} > {max_key}={max_val}. "
+                f"Значения будут поменены местами."
+            )
+            config[min_key], config[max_key] = max_val, min_val
+    return warnings
+
+
 # ============================================================================
 # ФУНКЦИИ РАБОТЫ С КОНФИГУРАЦИЕЙ
 # ============================================================================
@@ -648,6 +681,10 @@ def load_or_create_config() -> Tuple[Dict[str, Any], Dict[str, Any]]:
             schedule = data['schedule']
             # Гарантируем наличие всех ключей
             config = ensure_config_keys(config)
+            # Валидация диапазонов
+            validation_warnings = validate_config_ranges(config)
+            for w in validation_warnings:
+                print(w)
             # Ротация конфиг-файлов
             rotate_files('.', 'activity_config_*.json', config.get('max_config_files', 5),
                          'файл конфигурации', exclude_file=config_file)

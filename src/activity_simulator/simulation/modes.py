@@ -15,7 +15,7 @@ from .actions import get_consecutive_safe_key_count, random_mouse_move, safe_key
 
 
 def execute_burst_activity(
-    last_burst_time_ref: list[float],
+    burst_time_attr: str,
     burst_interval_min: int,
     burst_interval_max: int,
     burst_duration_min: int,
@@ -31,15 +31,15 @@ def execute_burst_activity(
     Используется как для внерабочего режима, так и для режима перерывов.
 
     Args:
-        last_burst_time_ref: list - [время] для изменяемой ссылки (используем список для мутации)
-        burst_interval_min: int - мин. интервал между всплесками в минутах
-        burst_interval_max: int - макс. интервал между всплесками в минутах
-        burst_duration_min: int - мин. продолжительность всплеска в секундах
-        burst_duration_max: int - макс. продолжительность всплеска в секундах
-        mode_name: str - название режима для логов (например, "Внерабочий режим", "Перерыв (обед)")
-        time_indicator: str - emoji индикатор времени (например, "🌅", "🌙", "☕")
-        check_break_ended: callable или None - функция для проверки окончания перерыва
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        burst_time_attr: Имя атрибута на state (например, 'last_afterhours_burst_time')
+        burst_interval_min: Мин. интервал между всплесками в минутах
+        burst_interval_max: Макс. интервал между всплесками в минутах
+        burst_duration_min: Мин. продолжительность всплеска в секундах
+        burst_duration_max: Макс. продолжительность всплеска в секундах
+        mode_name: Название режима для логов
+        time_indicator: Emoji индикатор
+        check_break_ended: Функция для проверки окончания перерыва
+        state: Экземпляр состояния (если None, используется глобальный)
 
     Returns:
         str: 'completed', 'interrupted', 'ended', или 'waiting'
@@ -47,13 +47,12 @@ def execute_burst_activity(
     if state is None:
         state = get_state()
 
-    time_since_burst = time.time() - last_burst_time_ref[0]
+    time_since_burst = time.time() - getattr(state, burst_time_attr)
     burst_interval = random.uniform(
         burst_interval_min * 60,
         burst_interval_max * 60
     )
 
-    # Проверяем время с последней активности пользователя
     time_since_user_activity = state.time_since_last_user_activity()
 
     if time_since_burst >= burst_interval and time_since_user_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
@@ -73,43 +72,38 @@ def execute_burst_activity(
         burst_completed = False
 
         while time.time() < burst_end_time:
-            # Проверяем, не закончился ли перерыв (если есть проверка)
+            # Проверяем, не закончился ли перерыв
             if check_break_ended is not None:
                 on_break_check, _ = check_break_ended()
                 if not on_break_check:
                     log(f"☕ Перерыв завершился. Выход из режима перерыва.", state=state)
-                    with state.lock:
-                        state.is_simulating = False
+                    state.is_simulating = False
                     return 'ended'
 
             # Проверка активности пользователя после работы
-            with state.lock:
-                if state.user_activity_after_work:
-                    log(f"🚪 {mode_name}: прерывание всплеска из-за активности пользователя после рабочего дня", state=state)
-                    burst_interrupted = True
-                    state.is_simulating = False
-                    break
+            if state.user_activity_after_work:
+                log(f"🚪 {mode_name}: прерывание всплеска из-за активности пользователя после рабочего дня", state=state)
+                burst_interrupted = True
+                state.is_simulating = False
+                break
 
             _perform_light_action(state)
 
             time.sleep(random.uniform(2, 5))
         else:
-            # Цикл завершился без break (время всплеска истекло)
             burst_completed = True
 
-        with state.lock:
-            state.is_simulating = False
+        state.is_simulating = False
 
         if burst_interrupted:
             return 'interrupted'
 
         if burst_completed:
-            last_burst_time_ref[0] = time.time()
+            setattr(state, burst_time_attr, time.time())
             log(f"{time_indicator} {mode_name}: всплеск активности завершен. Следующий через {burst_interval/60:.1f} мин", state=state)
             return 'completed'
 
     else:
-        # Ждем — либо после активности пользователя, либо до следующего интервала
         if time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
             remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_user_activity
             log(f"⏸️  Ожидание после активности пользователя: {remaining:.1f} сек", 'DEBUG', state=state)
@@ -129,20 +123,15 @@ def _perform_light_action(state: Optional['SimulationState'] = None) -> None:
         state = get_state()
     config = state.config
 
-    # Избегаем 5 подряд нажатий Shift
     consecutive_safe_keys = get_consecutive_safe_key_count(state)
     available_actions = []
 
-    # Проверяем, доступно ли движение мыши
     if config['use_mouse_move']:
         available_actions.append('mouse_move')
 
-    # Всегда добавляем safe_key, но ограничим если уже 4 подряд
     if consecutive_safe_keys < MAX_CONSECUTIVE_SAFE_KEYS:
         available_actions.append('safe_key')
 
-    # Если доступных действий нет (use_mouse_move=false и consecutive_safe_keys>=4)
-    # то все равно добавляем safe_key, чтобы программа не зависла
     if not available_actions:
         available_actions.append('safe_key')
 
@@ -156,5 +145,4 @@ def _perform_light_action(state: Optional['SimulationState'] = None) -> None:
     except Exception as e:
         log(f"Ошибка при выполнении действия: {e}", 'ERROR', state=state)
 
-    with state.lock:
-        state.last_activity_time = time.time()
+    state.last_activity_time = time.time()

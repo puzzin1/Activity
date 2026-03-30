@@ -46,8 +46,9 @@ def init_simulation(config: dict, schedule: dict) -> 'SimulationState':
 
 def simulate_activity() -> None:
     """Основной цикл симуляции активности"""
-    last_burst_time_list = [time.time()]  # Используем список для мутации
-    last_break_burst_time_list = [time.time()]  # Используем список для мутации
+    state = get_state()
+    state.last_afterhours_burst_time = time.time()
+    state.last_break_burst_time = time.time()
 
     while True:
         state = get_state()
@@ -92,10 +93,7 @@ def simulate_activity() -> None:
                 if sequence:
                     type_key_sequence(sequence, state)
                     state.lunch_sequence_executed = True
-
-                    # Обновляем время активности
-                    with state.lock:
-                        state.last_activity_time = time.time()
+                    state.last_activity_time = time.time()
                 else:
                     log(f"⚠️ Последовательность после обеда не задана", 'WARNING', state)
                     state.lunch_sequence_executed = True
@@ -110,8 +108,7 @@ def simulate_activity() -> None:
 
                 # Если мы ДО работы - просто ждем
                 if state.is_simulating:
-                    with state.lock:
-                        state.is_simulating = False
+                    state.is_simulating = False
                     log(f"🌙 Внерабочее время. Активность отключена (режим: {config['afterhours_mode']})", state=state)
                 time.sleep(60)
                 continue
@@ -119,7 +116,7 @@ def simulate_activity() -> None:
             # Режим всплесков активности
             time_indicator = "🌅" if is_before_work(state) else "🌙"
             execute_burst_activity(
-                last_burst_time_list,
+                'last_afterhours_burst_time',
                 config['afterhours_burst_interval_min'],
                 config['afterhours_burst_interval_max'],
                 config['afterhours_burst_duration_min'],
@@ -133,13 +130,12 @@ def simulate_activity() -> None:
         # === РЕЖИМ ПЕРЕРЫВА ===
         if on_break:
             if state.is_simulating:
-                with state.lock:
-                    state.is_simulating = False
+                state.is_simulating = False
                 log(f"☕ Перерыв ({break_type}). Переход в режим легкой активности.", state=state)
 
             # Логика всплесков активности во время перерыва
             execute_burst_activity(
-                last_break_burst_time_list,
+                'last_break_burst_time',
                 config['afterhours_burst_interval_min'],
                 config['afterhours_burst_interval_max'],
                 config['afterhours_burst_duration_min'],
@@ -182,8 +178,7 @@ def _handle_work_day_finished(state: Optional['SimulationState'] = None) -> None
         # Продолжаем работу в режиме ожидания
         time.sleep(60)
         state.shutdown_cancelled = False
-        with state.lock:
-            state.user_activity_after_work = False
+        state.user_activity_after_work = False
         return
 
     print("\n" + "=" * 70)
@@ -229,9 +224,8 @@ def _handle_work_mode(state: Optional['SimulationState'] = None) -> None:
         state = get_state()
     config = state.config
 
-    with state.lock:
-        current_idle_threshold_local = state.current_idle_threshold
-        is_simulating = state.is_simulating
+    current_idle_threshold_local = state.current_idle_threshold
+    is_simulating = state.is_simulating
 
     time_since_last_activity = state.time_since_last_user_activity()
 
@@ -247,7 +241,6 @@ def _handle_work_mode(state: Optional['SimulationState'] = None) -> None:
 
         with state.lock:
             state.current_idle_threshold = effective_threshold
-            current_idle_threshold_local = state.current_idle_threshold
         log(f"Установлен новый порог бездействия: {current_idle_threshold_local} сек", 'DEBUG', state)
 
     # КРИТИЧЕСКИ ВАЖНО: Минимальная задержка MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд
@@ -313,8 +306,7 @@ def _handle_work_mode(state: Optional['SimulationState'] = None) -> None:
             log(f"Ошибка при выполнении действия: {e}", 'ERROR', state)
 
         # Обновление времени активности
-        with state.lock:
-            state.last_activity_time = time.time()
+        state.last_activity_time = time.time()
 
         # Расчет паузы до следующего действия
         action_interval = random.uniform(
@@ -333,9 +325,8 @@ def _handle_work_mode(state: Optional['SimulationState'] = None) -> None:
     else:
         # Режим ожидания
         if is_simulating:
-            with state.lock:
-                if not state.is_simulating:
-                    log("Симуляция прервана активностью пользователя.", 'INFO', state)
+            if not state.is_simulating:
+                log("Симуляция прервана активностью пользователя.", 'INFO', state)
 
         # Показываем оставшееся время с учетом минимальной задержки
         if time_since_last_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:

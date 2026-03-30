@@ -28,16 +28,15 @@ class TestExecuteBurstActivity:
         state = create_state()
         state.set_config({'use_mouse_move': True})
         state.last_activity_time = 100
+        state.last_afterhours_burst_time = 0
         state.user_activity_after_work = True  # User active after work
         mock_mouse_ctrl.return_value.position = (500, 500)
 
         mock_time.return_value = 200
         mock_uniform.side_effect = lambda a, b: 0.01  # Always return a value
 
-        last_burst_time = [0]
-
         result = execute_burst_activity(
-            last_burst_time,
+            'last_afterhours_burst_time',
             burst_interval_min=1,
             burst_interval_max=3,
             burst_duration_min=5,
@@ -63,6 +62,7 @@ class TestExecuteBurstActivity:
         state = create_state()
         state.set_config({'use_mouse_move': True})
         state.last_activity_time = 100
+        state.last_break_burst_time = 0
         state.user_activity_after_work = False
         mock_mouse_ctrl.return_value.position = (500, 500)
 
@@ -72,10 +72,8 @@ class TestExecuteBurstActivity:
         # Mock check_break_ended to return False (break ended)
         check_break_ended = Mock(return_value=(False, None))
 
-        last_burst_time = [0]
-
         result = execute_burst_activity(
-            last_burst_time,
+            'last_break_burst_time',
             burst_interval_min=1,
             burst_interval_max=3,
             burst_duration_min=5,
@@ -105,16 +103,15 @@ class TestExecuteBurstActivity:
         state.set_config({'use_mouse_move': True})
         # User was active 30 seconds ago (less than MINIMUM_DELAY_AFTER_USER_ACTIVITY)
         state.last_activity_time = 200
+        state.last_afterhours_burst_time = 0
         state.user_activity_after_work = False
         mock_mouse_ctrl.return_value.position = (500, 500)
 
         mock_time.return_value = 230  # 30 seconds after last activity
         mock_uniform.side_effect = lambda a, b: 0.01
 
-        last_burst_time = [0]
-
         result = execute_burst_activity(
-            last_burst_time,
+            'last_afterhours_burst_time',
             burst_interval_min=1,
             burst_interval_max=3,
             burst_duration_min=5,
