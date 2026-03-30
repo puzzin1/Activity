@@ -54,8 +54,7 @@ def execute_burst_activity(
     )
 
     # Проверяем время с последней активности пользователя
-    with state.lock:
-        time_since_user_activity = time.time() - state.last_activity_time
+    time_since_user_activity = state.time_since_last_user_activity()
 
     if time_since_burst >= burst_interval and time_since_user_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
         burst_duration = random.uniform(burst_duration_min, burst_duration_max)

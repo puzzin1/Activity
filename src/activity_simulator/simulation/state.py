@@ -260,6 +260,14 @@ class SimulationState:
         with self._lock:
             self._schedule = schedule.copy()
 
+    # === Потокобезопасные методы ===
+
+    def time_since_last_user_activity(self) -> float:
+        """Возвращает секунды с момента последней активности пользователя (потокобезопасно)."""
+        import time
+        with self._lock:
+            return time.time() - self._last_activity_time
+
     # === Контекстный менеджер для работы с блокировкой ===
 
     def __enter__(self) -> 'SimulationState':

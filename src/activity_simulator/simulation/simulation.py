@@ -230,9 +230,10 @@ def _handle_work_mode(state: Optional['SimulationState'] = None) -> None:
     config = state.config
 
     with state.lock:
-        time_since_last_activity = time.time() - state.last_activity_time
         current_idle_threshold_local = state.current_idle_threshold
         is_simulating = state.is_simulating
+
+    time_since_last_activity = state.time_since_last_user_activity()
 
     # Генерация нового порога бездействия
     if current_idle_threshold_local is None:
