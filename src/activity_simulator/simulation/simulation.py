@@ -117,7 +117,17 @@ def simulate_activity() -> None:
                 continue
 
             # Режим всплесков активности
-            _handle_afterhours_burst(last_burst_time_list, state)
+            time_indicator = "🌅" if is_before_work(state) else "🌙"
+            execute_burst_activity(
+                last_burst_time_list,
+                config['afterhours_burst_interval_min'],
+                config['afterhours_burst_interval_max'],
+                config['afterhours_burst_duration_min'],
+                config['afterhours_burst_duration_max'],
+                "Внерабочий режим",
+                time_indicator,
+                state=state,
+            )
             continue
 
         # === РЕЖИМ ПЕРЕРЫВА ===
@@ -128,7 +138,17 @@ def simulate_activity() -> None:
                 log(f"☕ Перерыв ({break_type}). Переход в режим легкой активности.", state=state)
 
             # Логика всплесков активности во время перерыва
-            _handle_break_burst(last_break_burst_time_list, state)
+            execute_burst_activity(
+                last_break_burst_time_list,
+                config['afterhours_burst_interval_min'],
+                config['afterhours_burst_interval_max'],
+                config['afterhours_burst_duration_min'],
+                config['afterhours_burst_duration_max'],
+                f"Перерыв ({break_type})",
+                "☕",
+                check_break_ended=lambda: is_break_time(state),
+                state=state,
+            )
             continue
 
         # === ОБЫЧНЫЙ РАБОЧИЙ РЕЖИМ ===
@@ -196,208 +216,6 @@ def _handle_work_day_finished(state: Optional['SimulationState'] = None) -> None
     from .state import ExitSimulation
     raise ExitSimulation("Рабочий день завершен", show_warning=False)
 
-
-def _handle_afterhours_burst(last_burst_time_list: list, state: Optional['SimulationState'] = None) -> None:
-    """
-    Обрабатывает всплеск активности внерабочего режима.
-
-    Args:
-        last_burst_time_list: Список с временем последнего всплеска (для мутации)
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
-    """
-    if state is None:
-        state = get_state()
-    config = state.config
-
-    time_since_burst = time.time() - last_burst_time_list[0]
-    burst_interval = random.uniform(
-        config['afterhours_burst_interval_min'] * 60,
-        config['afterhours_burst_interval_max'] * 60
-    )
-
-    # Проверяем условия атомарно — вычисляем time_since_user_activity внутри условия
-    # чтобы избежать race condition между вычислением и проверкой
-    if time_since_burst >= burst_interval and (lambda: (time.time() - state.last_activity_time))() >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
-        burst_duration = random.uniform(
-            config['afterhours_burst_duration_min'],
-            config['afterhours_burst_duration_max']
-        )
-
-        time_indicator = "🌅" if is_before_work(state) else "🌙"
-        log(f"{time_indicator} Внерабочий режим: всплеск активности на {burst_duration:.0f} сек", state=state)
-
-        burst_end_time = time.time() + burst_duration
-
-        with state.lock:
-            mouse_controller = get_mouse_controller()
-            state.absolute_anchor_position = mouse_controller.position
-            state.initial_mouse_position = mouse_controller.position
-            state.is_simulating = True
-
-        burst_interrupted = False
-        while time.time() < burst_end_time:
-            # Проверка активности пользователя после работы
-            with state.lock:
-                if state.user_activity_after_work:
-                    log("🚪 Внерабочий режим: прерывание всплеска из-за активности пользователя после рабочего дня", state=state)
-                    burst_interrupted = True
-                    state.is_simulating = False
-                    break
-
-            _perform_light_action(state)
-
-            time.sleep(random.uniform(2, 5))
-
-        with state.lock:
-            state.is_simulating = False
-
-        if not burst_interrupted:
-            last_burst_time_list[0] = time.time()
-            log(f"{time_indicator} Всплеск активности завершен. Следующий через {burst_interval/60:.1f} мин", state=state)
-
-    else:
-        # Проверяем ожидание после активности пользователя
-        with state.lock:
-            time_since_user_activity = time.time() - state.last_activity_time
-        if time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
-            remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_user_activity
-            log(f"⏸️  Ожидание после активности пользователя: {remaining:.1f} сек", 'DEBUG', state)
-            time.sleep(10)
-        else:
-            time.sleep(10)
-
-
-def _handle_break_burst(last_break_burst_time_list: list, state: Optional['SimulationState'] = None) -> None:
-    """
-    Обрабатывает всплеск активности во время перерыва.
-
-    Args:
-        last_break_burst_time_list: Список с временем последнего всплеска (для мутации)
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
-    """
-    if state is None:
-        state = get_state()
-    config = state.config
-
-    time_since_break_burst = time.time() - last_break_burst_time_list[0]
-    burst_interval = random.uniform(
-        config['afterhours_burst_interval_min'] * 60,
-        config['afterhours_burst_interval_max'] * 60
-    )
-
-    # Проверяем условия атомарно — вычисляем time_since_user_activity внутри условия
-    # чтобы избежать race condition между вычислением и проверкой
-    if time_since_break_burst >= burst_interval and (lambda: (time.time() - state.last_activity_time))() >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
-        burst_duration = random.uniform(
-            config['afterhours_burst_duration_min'],
-            config['afterhours_burst_duration_max']
-        )
-
-        on_break_check, break_type_check = is_break_time(state)
-        log(f"☕ Перерыв ({break_type_check}): всплеск активности на {burst_duration:.0f} сек", state=state)
-
-        burst_end_time = time.time() + burst_duration
-
-        with state.lock:
-            mouse_controller = get_mouse_controller()
-            state.absolute_anchor_position = mouse_controller.position
-            state.initial_mouse_position = mouse_controller.position
-            state.is_simulating = True
-
-        burst_completed = False
-        break_ended = False
-        burst_interrupted = False
-
-        while time.time() < burst_end_time:
-            # Проверяем, не закончился ли перерыв
-            on_break_check, break_type_check = is_break_time(state)
-            if not on_break_check:
-                log(f"☕ Перерыв завершился. Выход из режима перерыва.", state=state)
-                break_ended = True
-                break
-
-            # Проверка активности пользователя после работы
-            with state.lock:
-                if state.user_activity_after_work:
-                    log("🚪 Режим перерыва: прерывание всплеска из-за активности пользователя после рабочего дня", state=state)
-                    burst_interrupted = True
-                    break
-
-            _perform_light_action(state)
-
-            time.sleep(random.uniform(2, 5))
-        else:
-            # Цикл завершился без break (время всплеска истекло)
-            burst_completed = True
-
-        with state.lock:
-            state.is_simulating = False
-
-        if burst_interrupted:
-            return
-
-        if break_ended:
-            # Перерыв закончился досрочно, не обновляем время последнего всплеска
-            return
-
-        if burst_completed:
-            last_break_burst_time_list[0] = time.time()
-            log(f"☕ Перерыв ({break_type_check}): всплеск активности завершен. Следующий через {burst_interval/60:.1f} мин", state=state)
-
-    else:
-        # Проверяем ожидание после активности пользователя
-        with state.lock:
-            time_since_user_activity = time.time() - state.last_activity_time
-        if time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
-            remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_user_activity
-            log(f"⏸️  Ожидание после активности пользователя: {remaining:.1f} сек", 'DEBUG', state)
-            time.sleep(10)
-        else:
-            time.sleep(10)
-
-
-def _perform_light_action(state: Optional['SimulationState'] = None) -> None:
-    """
-    Выполняет легкое действие (используется в перерывах и внерабочем режиме).
-
-    Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
-    """
-    # MAX_CONSECUTIVE_SAFE_KEYS уже импортирован из state
-
-    if state is None:
-        state = get_state()
-    config = state.config
-
-    # Избегаем 5 подряд нажатий Shift
-    consecutive_safe_keys = get_consecutive_safe_key_count(state)
-    available_actions = []
-
-    # Проверяем, доступно ли движение мыши
-    if config['use_mouse_move']:
-        available_actions.append('mouse_move')
-
-    # Всегда добавляем safe_key, но ограничим если уже 4 подряд
-    if consecutive_safe_keys < MAX_CONSECUTIVE_SAFE_KEYS:
-        available_actions.append('safe_key')
-
-    # Если доступных действий нет (use_mouse_move=false и consecutive_safe_keys>=4)
-    # то все равно добавляем safe_key, чтобы программа не зависла
-    if not available_actions:
-        available_actions.append('safe_key')
-
-    action = random.choice(available_actions)
-
-    try:
-        if action == 'mouse_move':
-            random_mouse_move(state)
-        elif action == 'safe_key':
-            safe_key_press(state)
-    except Exception as e:
-        log(f"Ошибка при выполнении действия: {e}", 'ERROR', state)
-
-    with state.lock:
-        state.last_activity_time = time.time()
 
 
 def _handle_work_mode(state: Optional['SimulationState'] = None) -> None:

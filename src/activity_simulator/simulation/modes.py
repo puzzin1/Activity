@@ -36,8 +36,8 @@ def execute_burst_activity(
         burst_interval_max: int - макс. интервал между всплесками в минутах
         burst_duration_min: int - мин. продолжительность всплеска в секундах
         burst_duration_max: int - макс. продолжительность всплеска в секундах
-        mode_name: str - название режима для логов (например, "Внерабочий", "Перерыв")
-        time_indicator: str - emoji индикатор времени (например, "🌅", "🌙")
+        mode_name: str - название режима для логов (например, "Внерабочий режим", "Перерыв (обед)")
+        time_indicator: str - emoji индикатор времени (например, "🌅", "🌙", "☕")
         check_break_ended: callable или None - функция для проверки окончания перерыва
         state: Экземпляр состояния симуляции (если None, используется глобальный)
 
@@ -46,22 +46,21 @@ def execute_burst_activity(
     """
     if state is None:
         state = get_state()
-    config = state.config
-    current_last_burst = last_burst_time_ref[0]
-    time_since_burst = time.time() - current_last_burst
+
+    time_since_burst = time.time() - last_burst_time_ref[0]
     burst_interval = random.uniform(
         burst_interval_min * 60,
         burst_interval_max * 60
     )
 
-    # Проверяем, прошло ли минимум MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд с последней активности пользователя
+    # Проверяем время с последней активности пользователя
     with state.lock:
         time_since_user_activity = time.time() - state.last_activity_time
 
     if time_since_burst >= burst_interval and time_since_user_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY:
         burst_duration = random.uniform(burst_duration_min, burst_duration_max)
 
-        log(f"{time_indicator} {mode_name}: всплеск активности на {burst_duration:.0f} сек")
+        log(f"{time_indicator} {mode_name}: всплеск активности на {burst_duration:.0f} сек", state=state)
 
         burst_end_time = time.time() + burst_duration
 
@@ -79,47 +78,20 @@ def execute_burst_activity(
             if check_break_ended is not None:
                 on_break_check, _ = check_break_ended()
                 if not on_break_check:
-                    log(f"☕ Перерыв завершился. Выход из режима перерыва.")
+                    log(f"☕ Перерыв завершился. Выход из режима перерыва.", state=state)
+                    with state.lock:
+                        state.is_simulating = False
                     return 'ended'
 
             # Проверка активности пользователя после работы
-            if state.user_activity_after_work:
-                log(f"🚪 {mode_name}: прерывание всплеска из-за активности пользователя после рабочего дня")
-                burst_interrupted = True
-                with state.lock:
-                    state.is_simulating = False
-                break
-
-            # Выполняем легкую активность
-            # Избегаем 5 подряд нажатий Shift
-            consecutive_safe_keys = get_consecutive_safe_key_count()
-            available_actions = []
-
-            # Проверяем, доступно ли движение мыши
-            if config['use_mouse_move']:
-                available_actions.append('mouse_move')
-
-            # Всегда добавляем safe_key, но ограничим если уже 4 подряд
-            if consecutive_safe_keys < MAX_CONSECUTIVE_SAFE_KEYS:
-                available_actions.append('safe_key')
-
-            # Если доступных действий нет - все равно добавляем safe_key
-            if not available_actions:
-                available_actions.append('safe_key')
-                log(f"⚠️ {mode_name}: вынужденно используем safe_key (уже {consecutive_safe_keys} подряд)", 'DEBUG')
-
-            action = random.choice(available_actions)
-
-            try:
-                if action == 'mouse_move':
-                    random_mouse_move()
-                elif action == 'safe_key':
-                    safe_key_press()
-            except Exception as e:
-                log(f"Ошибка при выполнении действия: {e}", 'ERROR')
-
             with state.lock:
-                state.last_activity_time = time.time()
+                if state.user_activity_after_work:
+                    log(f"🚪 {mode_name}: прерывание всплеска из-за активности пользователя после рабочего дня", state=state)
+                    burst_interrupted = True
+                    state.is_simulating = False
+                    break
+
+            _perform_light_action(state)
 
             time.sleep(random.uniform(2, 5))
         else:
@@ -134,13 +106,56 @@ def execute_burst_activity(
 
         if burst_completed:
             last_burst_time_ref[0] = time.time()
-            log(f"{time_indicator} {mode_name}: всплеск активности завершен. Следующий через {burst_interval/60:.1f} мин")
+            log(f"{time_indicator} {mode_name}: всплеск активности завершен. Следующий через {burst_interval/60:.1f} мин", state=state)
             return 'completed'
 
-    elif time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
-        # Ждем, пока не пройдет минимальная задержка после активности пользователя
-        remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_user_activity
-        log(f"⏸️  Ожидание после активности пользователя: {remaining:.1f} сек", 'DEBUG')
+    else:
+        # Ждем — либо после активности пользователя, либо до следующего интервала
+        if time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+            remaining = MINIMUM_DELAY_AFTER_USER_ACTIVITY - time_since_user_activity
+            log(f"⏸️  Ожидание после активности пользователя: {remaining:.1f} сек", 'DEBUG', state=state)
         time.sleep(10)
 
     return 'waiting'
+
+
+def _perform_light_action(state: Optional['SimulationState'] = None) -> None:
+    """
+    Выполняет легкое действие (используется в перерывах и внерабочем режиме).
+
+    Args:
+        state: Экземпляр состояния симуляции (если None, используется глобальный)
+    """
+    if state is None:
+        state = get_state()
+    config = state.config
+
+    # Избегаем 5 подряд нажатий Shift
+    consecutive_safe_keys = get_consecutive_safe_key_count(state)
+    available_actions = []
+
+    # Проверяем, доступно ли движение мыши
+    if config['use_mouse_move']:
+        available_actions.append('mouse_move')
+
+    # Всегда добавляем safe_key, но ограничим если уже 4 подряд
+    if consecutive_safe_keys < MAX_CONSECUTIVE_SAFE_KEYS:
+        available_actions.append('safe_key')
+
+    # Если доступных действий нет (use_mouse_move=false и consecutive_safe_keys>=4)
+    # то все равно добавляем safe_key, чтобы программа не зависла
+    if not available_actions:
+        available_actions.append('safe_key')
+
+    action = random.choice(available_actions)
+
+    try:
+        if action == 'mouse_move':
+            random_mouse_move(state)
+        elif action == 'safe_key':
+            safe_key_press(state)
+    except Exception as e:
+        log(f"Ошибка при выполнении действия: {e}", 'ERROR', state=state)
+
+    with state.lock:
+        state.last_activity_time = time.time()
