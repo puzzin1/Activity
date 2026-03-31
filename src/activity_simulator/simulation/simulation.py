@@ -10,7 +10,7 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from .state import get_state, SimulationState, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller
+from .state import get_state, SimulationState, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller, ExitSimulation
 from .logger import log
 from .time_checks import (
     is_work_hours, is_before_work, is_after_work,
@@ -46,110 +46,123 @@ def init_simulation(config: dict, schedule: dict) -> 'SimulationState':
 
 def simulate_activity() -> None:
     """Основной цикл симуляции активности"""
+    import traceback
     state = get_state()
     state.last_afterhours_burst_time = time.time()
     state.last_break_burst_time = time.time()
 
-    while True:
-        state = get_state()
-        config = state.config
+    try:
+        while True:
+            state = get_state()
+            config = state.config
 
-        # Проверка: прошло ли 60 секунд с момента запуска программы
-        # Первое симулированное действие не ранее 60 сек после запуска
-        time_since_start = time.time() - state.program_start_time
-        if time_since_start < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
-            time.sleep(1)
-            continue
-
-        # Проверка активности пользователя после работы
-        if state.user_activity_after_work:
-            log("🚪 Завершение программы из-за активности пользователя после рабочего дня", state=state)
-            print("\n" + "=" * 70)
-            print("🚪 ОБНАРУЖЕНА АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ")
-            print("=" * 70)
-            print("Программа завершена без блокировки/выключения компьютера")
-            if config['verbose_logging']:
-                print(f"📄 Лог сохранён в файл: {state.log_file_path}")
-            print("=" * 70)
-            time.sleep(1)
-            state.simulation_finished = True
-            from .state import ExitSimulation
-            raise ExitSimulation("Активность пользователя после рабочего дня")
-
-        # Проверяем режим работы
-        in_work_hours = is_work_hours(state)
-        on_break, break_type = is_break_time(state)
-
-        # === ПРОВЕРКА И ВЫПОЛНЕНИЕ ДЕЙСТВИЙ ПОСЛЕ ОБЕДА ===
-        if config.get('after_lunch_action', False) and not state.lunch_sequence_executed:
-            # Проверяем, прошел ли обед и находимся ли мы после него
-            if in_work_hours and is_after_lunch(state) and not on_break:
-                log(f"🍽️ Обеденный перерыв завершен. Ожидание {config.get('after_lunch_delay', 5)} сек...", state=state)
-                time.sleep(config.get('after_lunch_delay', 5))
-
-                # Вводим последовательность клавиш из переменной окружения
-                env_var_name = config.get('after_lunch_sequence', '')
-                sequence = os.environ.get(env_var_name, '') if env_var_name else ''
-                if sequence:
-                    type_key_sequence(sequence, state)
-                    state.lunch_sequence_executed = True
-                    state.last_activity_time = time.time()
-                else:
-                    log(f"⚠️ Последовательность после обеда не задана", 'WARNING', state)
-                    state.lunch_sequence_executed = True
-
-        # === РЕЖИМ ВНЕ РАБОЧЕГО ВРЕМЕНИ ===
-        if not in_work_hours:
-            # Проверяем, нужна ли активность вне рабочего времени
-            if not should_simulate_afterhours(state):
-                # Если мы ПОСЛЕ работы и активность отключена - завершаем программу
-                if is_after_work(state):
-                    _handle_work_day_finished(state)
-
-                # Если мы ДО работы - просто ждем
-                if state.is_simulating:
-                    state.is_simulating = False
-                    log(f"🌙 Внерабочее время. Активность отключена (режим: {config['afterhours_mode']})", state=state)
-                time.sleep(60)
+            # Проверка: прошло ли 60 секунд с момента запуска программы
+            # Первое симулированное действие не ранее 60 сек после запуска
+            time_since_start = time.time() - state.program_start_time
+            if time_since_start < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+                time.sleep(1)
                 continue
 
-            # Режим всплесков активности
-            time_indicator = "🌅" if is_before_work(state) else "🌙"
-            execute_burst_activity(
-                'last_afterhours_burst_time',
-                config['afterhours_burst_interval_min'],
-                config['afterhours_burst_interval_max'],
-                config['afterhours_burst_duration_min'],
-                config['afterhours_burst_duration_max'],
-                "Внерабочий режим",
-                time_indicator,
-                state=state,
-            )
+            # Проверка активности пользователя после работы
+            if state.user_activity_after_work:
+                log("🚪 Завершение программы из-за активности пользователя после рабочего дня", state=state)
+                print("\n" + "=" * 70)
+                print("🚪 ОБНАРУЖЕНА АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ")
+                print("=" * 70)
+                print("Программа завершена без блокировки/выключения компьютера")
+                if config['verbose_logging']:
+                    print(f"📄 Лог сохранён в файл: {state.log_file_path}")
+                print("=" * 70)
+                time.sleep(1)
+                state.simulation_finished = True
+                raise ExitSimulation("Активность пользователя после рабочего дня")
+
+            # Проверяем режим работы
+            in_work_hours = is_work_hours(state)
+            on_break, break_type = is_break_time(state)
+
+            # === ПРОВЕРКА И ВЫПОЛНЕНИЕ ДЕЙСТВИЙ ПОСЛЕ ОБЕДА ===
+            if config.get('after_lunch_action', False) and not state.lunch_sequence_executed:
+                # Проверяем, прошел ли обед и находимся ли мы после него
+                if in_work_hours and is_after_lunch(state) and not on_break:
+                    log(f"🍽️ Обеденный перерыв завершен. Ожидание {config.get('after_lunch_delay', 5)} сек...", state=state)
+                    time.sleep(config.get('after_lunch_delay', 5))
+
+                    # Вводим последовательность клавиш из переменной окружения
+                    env_var_name = config.get('after_lunch_sequence', '')
+                    sequence = os.environ.get(env_var_name, '') if env_var_name else ''
+                    if sequence:
+                        type_key_sequence(sequence, state)
+                        state.lunch_sequence_executed = True
+                        state.last_activity_time = time.time()
+                    else:
+                        log(f"⚠️ Последовательность после обеда не задана", 'WARNING', state)
+                        state.lunch_sequence_executed = True
+
+            # === РЕЖИМ ВНЕ РАБОЧЕГО ВРЕМЕНИ ===
+            if not in_work_hours:
+                # Проверяем, нужна ли активность вне рабочего времени
+                if not should_simulate_afterhours(state):
+                    # Если мы ПОСЛЕ работы и активность отключена - завершаем программу
+                    if is_after_work(state):
+                        _handle_work_day_finished(state)
+
+                    # Если мы ДО работы - просто ждем
+                    if state.is_simulating:
+                        state.is_simulating = False
+                        log(f"🌙 Внерабочее время. Активность отключена (режим: {config['afterhours_mode']})", state=state)
+                    time.sleep(60)
+                    continue
+
+                # Режим всплесков активности
+                time_indicator = "🌅" if is_before_work(state) else "🌙"
+                execute_burst_activity(
+                    'last_afterhours_burst_time',
+                    config['afterhours_burst_interval_min'],
+                    config['afterhours_burst_interval_max'],
+                    config['afterhours_burst_duration_min'],
+                    config['afterhours_burst_duration_max'],
+                    "Внерабочий режим",
+                    time_indicator,
+                    state=state,
+                )
+                continue
+
+            # === РЕЖИМ ПЕРЕРЫВА ===
+            if on_break:
+                if state.is_simulating:
+                    state.is_simulating = False
+                    log(f"☕ Перерыв ({break_type}). Переход в режим легкой активности.", state=state)
+
+                # Логика всплесков активности во время перерыва
+                execute_burst_activity(
+                    'last_break_burst_time',
+                    config['afterhours_burst_interval_min'],
+                    config['afterhours_burst_interval_max'],
+                    config['afterhours_burst_duration_min'],
+                    config['afterhours_burst_duration_max'],
+                    f"Перерыв ({break_type})",
+                    "☕",
+                    check_break_ended=lambda: is_break_time(state),
+                    state=state,
+                )
+                continue
+
+            # === ОБЫЧНЫЙ РАБОЧИЙ РЕЖИМ ===
+            _handle_work_mode(state)
             continue
 
-        # === РЕЖИМ ПЕРЕРЫВА ===
-        if on_break:
-            if state.is_simulating:
-                state.is_simulating = False
-                log(f"☕ Перерыв ({break_type}). Переход в режим легкой активности.", state=state)
-
-            # Логика всплесков активности во время перерыва
-            execute_burst_activity(
-                'last_break_burst_time',
-                config['afterhours_burst_interval_min'],
-                config['afterhours_burst_interval_max'],
-                config['afterhours_burst_duration_min'],
-                config['afterhours_burst_duration_max'],
-                f"Перерыв ({break_type})",
-                "☕",
-                check_break_ended=lambda: is_break_time(state),
-                state=state,
-            )
-            continue
-
-        # === ОБЫЧНЫЙ РАБОЧИЙ РЕЖИМ ===
-        _handle_work_mode(state)
-        continue
+    except ExitSimulation:
+        raise  # Пробрасываем контролируемое завершение
+    except Exception as e:
+        # Логируем неперехваченную ошибку перед падением потока
+        tb = traceback.format_exc()
+        try:
+            log(f"КРИТИЧЕСКАЯ ОШИБКА в потоке симуляции: {e}\n{tb}", 'ERROR', state)
+        except Exception:
+            pass  # Если логгер тоже упал — хотя бы в консоль
+        print(f"\n❌ КРИТИЧЕСКАЯ ОШИБКА в потоке симуляции: {e}\n{tb}", file=__import__('sys').stderr)
+        raise
 
 
 def _handle_work_day_finished(state: Optional['SimulationState'] = None) -> None:
