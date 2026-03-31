@@ -241,7 +241,8 @@ def _handle_work_mode(state: Optional['SimulationState'] = None) -> None:
 
         with state.lock:
             state.current_idle_threshold = effective_threshold
-        log(f"Установлен новый порог бездействия: {current_idle_threshold_local} сек", 'DEBUG', state)
+        current_idle_threshold_local = effective_threshold
+        log(f"Установлен новый порог бездействия: {effective_threshold} сек", 'DEBUG', state)
 
     # КРИТИЧЕСКИ ВАЖНО: Минимальная задержка MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд
     if time_since_last_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY and \
