@@ -52,7 +52,7 @@ def on_keyboard_event(key: 'Union[Key, KeyCode]', state: Optional['simulation.Si
         state = simulation.get_state()
 
     with state.lock:
-        if state.is_performing_action:
+        if state.is_performing_action or time.time() < state.sim_action_grace_until:
             simulation.log(f"Игнорирование симулированного события клавиатуры", 'DEBUG')
             return
 
@@ -80,7 +80,7 @@ def on_mouse_event(x: int, y: int, state: Optional['simulation.SimulationState']
         state = simulation.get_state()
 
     with state.lock:
-        if state.is_performing_action:
+        if state.is_performing_action or time.time() < state.sim_action_grace_until:
             return
 
         if _check_and_update_activity_after_work(state):
@@ -116,7 +116,7 @@ def on_mouse_click(x: int, y: int, button: 'Button', pressed: bool, state: Optio
 
     if pressed:
         with state.lock:
-            if state.is_performing_action:
+            if state.is_performing_action or time.time() < state.sim_action_grace_until:
                 simulation.log(f"Игнорирование симулированного клика мыши", 'DEBUG', state)
                 return
 

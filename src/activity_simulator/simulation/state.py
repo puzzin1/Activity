@@ -25,6 +25,10 @@ MAX_CONSECUTIVE_SAFE_KEYS: int = 4
 # Порог очистки истории действий
 ACTION_HISTORY_CLEAR_THRESHOLD: int = 100
 
+# Grace period (секунды) после завершения симулированного действия,
+# в течение которого слушатели игнорируют события (защита от гонки с pynput)
+SIM_ACTION_GRACE_PERIOD: float = 1.0
+
 
 # === КЛАССЫ ИСКЛЮЧЕНИЙ ===
 
@@ -101,6 +105,7 @@ class SimulationState:
         self._config: dict = {}
         self._schedule: dict = {}
         self._program_start_time: float = 0.0
+        self._sim_action_grace_until: float = 0.0
 
     # === Свойства для доступа к состоянию ===
 
@@ -162,7 +167,17 @@ class SimulationState:
     @is_performing_action.setter
     def is_performing_action(self, value: bool) -> None:
         with self._lock:
+            was_performing = self._is_performing_action
             self._is_performing_action = value
+            if was_performing and not value:
+                import time as _time
+                self._sim_action_grace_until = _time.time() + SIM_ACTION_GRACE_PERIOD
+
+    @property
+    def sim_action_grace_until(self) -> float:
+        """Время до которого слушатели игнорируют события (grace period после симулированного действия)."""
+        with self._lock:
+            return self._sim_action_grace_until
 
     @property
     def action_history(self) -> deque[Tuple[str, float]]:

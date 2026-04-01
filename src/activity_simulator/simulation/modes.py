@@ -144,5 +144,3 @@ def _perform_light_action(state: Optional['SimulationState'] = None) -> None:
             safe_key_press(state)
     except Exception as e:
         log(f"Ошибка при выполнении действия: {e}", 'ERROR', state=state)
-
-    state.last_activity_time = time.time()

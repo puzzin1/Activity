@@ -319,9 +319,6 @@ def _handle_work_mode(state: Optional['SimulationState'] = None) -> None:
         except Exception as e:
             log(f"Ошибка при выполнении действия: {e}", 'ERROR', state)
 
-        # Обновление времени активности
-        state.last_activity_time = time.time()
-
         # Расчет паузы до следующего действия
         action_interval = random.uniform(
             config['min_action_interval'],
