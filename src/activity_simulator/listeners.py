@@ -74,7 +74,7 @@ def on_keyboard_event(key: 'Union[Key, KeyCode]', state: Optional['simulation.Si
         simulation.log(f"Traceback: {''.join(traceback.format_exc())}", 'ERROR')
 
 
-def on_mouse_event(x: int, y: int, injected: bool, state: Optional['simulation.SimulationState'] = None) -> None:
+def on_mouse_event(x: int, y: int, injected: bool = False, state: Optional['simulation.SimulationState'] = None) -> None:
     """
     Обработчик движения мыши/тачпада.
     Автоматически отслеживает как движения мыши, так и тачпада.
@@ -116,7 +116,7 @@ def on_mouse_event(x: int, y: int, injected: bool, state: Optional['simulation.S
         simulation.log(f"Traceback: {''.join(traceback.format_exc())}", 'ERROR')
 
 
-def on_mouse_click(x: int, y: int, button: 'Button', pressed: bool, injected: bool, state: Optional['simulation.SimulationState'] = None) -> None:
+def on_mouse_click(x: int, y: int, button: 'Button', pressed: bool, injected: bool = False, state: Optional['simulation.SimulationState'] = None) -> None:
     """
     Обработчик кликов мыши/тачпада.
     Автоматически отслеживает как клики мыши, так и тапы тачпада.
