@@ -1,20 +1,21 @@
 @echo off
-REM ����� ����⭮� ���ᨨ activity-simulator
+chcp 65001 >nul
+REM Запуск симулятора активности
 
-REM ��४��砥��� � ��४��� �ਯ�
+REM Переход в директорию скрипта
 cd /d "%~dp0"
 
-REM �஢��塞, ��⠭����� �� �����
+REM Проверяем, установлен ли пакет
 python -c "import activity_simulator" 2>nul
 if %errorlevel% neq 0 (
-    echo ����� activity_simulator �� ������, ��⠭��������...
+    echo Пакет activity_simulator не установлен, устанавливаем...
     pip install -e . --no-warn-script-location
     if %errorlevel% neq 0 (
-        echo �訡�� �� ��⠭���� �����!
+        echo Ошибка при установке пакета!
         pause
         exit /b 1
     )
 )
 
-REM ����᪠�� ᨬ����
+REM Запускаем симулятор
 start python -m activity_simulator
