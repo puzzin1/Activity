@@ -40,7 +40,7 @@ def _check_and_update_activity_after_work(state: Optional['simulation.Simulation
 
 # === ФУНКЦИИ-СЛУШАТЕЛИ ===
 
-def on_keyboard_event(key: 'Union[Key, KeyCode]', state: Optional['simulation.SimulationState'] = None) -> None:
+def on_keyboard_event(key: 'Union[Key, KeyCode]', injected: bool = False, state: Optional['simulation.SimulationState'] = None) -> None:
     """
     Обработчик нажатий клавиатуры.
 
