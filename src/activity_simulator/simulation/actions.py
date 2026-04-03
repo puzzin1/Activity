@@ -8,28 +8,24 @@
 import time
 import random
 from datetime import datetime
-from typing import Optional
-
 from .. import utils
-from .state import get_state, SimulationState, get_mouse_controller, get_keyboard_controller, MINIMUM_DELAY_AFTER_USER_ACTIVITY
+from .state import SimulationState, get_mouse_controller, get_keyboard_controller, MINIMUM_DELAY_AFTER_USER_ACTIVITY
 from .logger import log
 from .time_checks import is_before_work
 
 
 # === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
-def get_consecutive_safe_key_count(state: Optional['SimulationState'] = None) -> int:
+def get_consecutive_safe_key_count(state: 'SimulationState') -> int:
     """
     Возвращает количество подряд идущих safe_key действий в конце истории.
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
 
     Returns:
         Количество последовательных safe_key действий
     """
-    if state is None:
-        state = get_state()
     count = 0
     # Идем с конца истории и считаем последовательные safe_key
     for action_type, _ in reversed(state.action_history):
@@ -40,17 +36,15 @@ def get_consecutive_safe_key_count(state: Optional['SimulationState'] = None) ->
     return count
 
 
-def move_mouse_naturally(target_x: int, target_y: int, state: Optional['SimulationState'] = None) -> None:
+def move_mouse_naturally(target_x: int, target_y: int, state: 'SimulationState') -> None:
     """
     Плавное перемещение мыши к целевой позиции.
 
     Args:
         target_x: Целевая координата X
         target_y: Целевая координата Y
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
-    if state is None:
-        state = get_state()
     mouse_controller = get_mouse_controller()
     start_pos = mouse_controller.position
     dx = target_x - start_pos[0]
@@ -103,19 +97,17 @@ def move_mouse_naturally(target_x: int, target_y: int, state: Optional['Simulati
 
 # === ФУНКЦИИ ВЫПОЛНЕНИЯ ДЕЙСТВИЙ ===
 
-def type_key_sequence(sequence: str, state: Optional['SimulationState'] = None) -> None:
+def type_key_sequence(sequence: str, state: 'SimulationState') -> None:
     """
     Вводит последовательность клавиш, включая специальные клавиши.
 
     Args:
         sequence: Строка с последовательностью, например "text{Enter}{Tab}"
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
     if not sequence:
         return
 
-    if state is None:
-        state = get_state()
     with state.lock:
         if state.user_activity_after_work:
             return
@@ -166,18 +158,16 @@ def type_key_sequence(sequence: str, state: Optional['SimulationState'] = None) 
             state.is_performing_action = False
 
 
-def show_shutdown_warning(state: Optional['SimulationState'] = None) -> bool:
+def show_shutdown_warning(state: 'SimulationState') -> bool:
     """
     Показывает всплывающее окно с предупреждением о выключении.
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
 
     Returns:
         True если нужно продолжить выключение, False если отменено
     """
-    if state is None:
-        state = get_state()
     import tkinter as tk
     from threading import Timer
     timer = None
@@ -244,15 +234,13 @@ def show_shutdown_warning(state: Optional['SimulationState'] = None) -> bool:
     return not state.shutdown_cancelled
 
 
-def random_mouse_move(state: Optional['SimulationState'] = None) -> None:
+def random_mouse_move(state: 'SimulationState') -> None:
     """
     Случайное движение мыши в пределах заданного диапазона.
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
-    if state is None:
-        state = get_state()
     config = state.config
     max_range_relative = config['max_mouse_range']
 
@@ -286,15 +274,13 @@ def random_mouse_move(state: Optional['SimulationState'] = None) -> None:
     state.initial_mouse_position = get_mouse_controller().position
 
 
-def random_arrow_press(state: Optional['SimulationState'] = None) -> None:
+def random_arrow_press(state: 'SimulationState') -> None:
     """
     Нажатие клавиш-стрелок (имитация прокрутки/навигации).
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
-    if state is None:
-        state = get_state()
     from pynput.keyboard import Key
 
     config = state.config
@@ -344,15 +330,13 @@ def random_arrow_press(state: Optional['SimulationState'] = None) -> None:
     state.action_history.append(('keyboard', time.time()))
 
 
-def random_mouse_click(state: Optional['SimulationState'] = None) -> None:
+def random_mouse_click(state: 'SimulationState') -> None:
     """
     Клик левой кнопкой мыши в текущей позиции.
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
-    if state is None:
-        state = get_state()
     from pynput.mouse import Button
     with state.lock:
         if state.user_activity_after_work:
@@ -369,15 +353,13 @@ def random_mouse_click(state: Optional['SimulationState'] = None) -> None:
     state.action_history.append(('mouse_click', time.time()))
 
 
-def safe_key_press(state: Optional['SimulationState'] = None) -> None:
+def safe_key_press(state: 'SimulationState') -> None:
     """
     Нажатие безопасной клавиши (Shift) - не производит побочных эффектов.
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
-    if state is None:
-        state = get_state()
     from pynput.keyboard import Key
     with state.lock:
         if state.user_activity_after_work:
@@ -397,15 +379,13 @@ def safe_key_press(state: Optional['SimulationState'] = None) -> None:
     state.action_history.append(('safe_key', time.time()))
 
 
-def control_tab_press(state: Optional['SimulationState'] = None) -> None:
+def control_tab_press(state: 'SimulationState') -> None:
     """
     Нажатие Ctrl+Tab (переключение вкладок).
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
-    if state is None:
-        state = get_state()
     from pynput.keyboard import Key
     log(f"Нажатие комбинации клавиш")
 

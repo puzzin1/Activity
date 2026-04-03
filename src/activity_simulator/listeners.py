@@ -3,7 +3,7 @@
 Содержит функции-слушатели для отслеживания активности пользователя.
 """
 
-from typing import Union, Optional, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING
 import time
 import sys
 
@@ -17,20 +17,18 @@ from . import simulation
 
 # === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
-def _check_and_update_activity_after_work(state: Optional['simulation.SimulationState'] = None) -> bool:
+def _check_and_update_activity_after_work(state: 'simulation.SimulationState') -> bool:
     """
     Проверяет активность после рабочего дня и обновляет флаг.
     Возвращает True, если нужно прервать обработку (послерабочее время).
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
 
     Returns:
         True если нужно прервать обработку
     """
-    if state is None:
-        state = simulation.get_state()
-    if state.config.get('exit_on_activity_after_work', True) and simulation.is_after_work() and not simulation.is_work_hours():
+    if state.config.get('exit_on_activity_after_work', True) and simulation.is_after_work(state) and not simulation.is_work_hours(state):
         if not state.user_activity_after_work:
             state.user_activity_after_work = True
             simulation.log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.")
@@ -40,18 +38,15 @@ def _check_and_update_activity_after_work(state: Optional['simulation.Simulation
 
 # === ФУНКЦИИ-СЛУШАТЕЛИ ===
 
-def on_keyboard_event(key: 'Union[Key, KeyCode]', injected: bool = False, state: Optional['simulation.SimulationState'] = None) -> None:
+def on_keyboard_event(key: 'Union[Key, KeyCode]', injected: bool = False, state: 'simulation.SimulationState' = None) -> None:
     """
     Обработчик нажатий клавиатуры.
 
     Args:
         key: Нажатая клавиша
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
     try:
-        if state is None:
-            state = simulation.get_state()
-
         with state.lock:
             if state.is_performing_action or time.time() < state.sim_action_grace_until:
                 simulation.log(f"Игнорирование симулированного события клавиатуры", 'DEBUG')
@@ -67,14 +62,12 @@ def on_keyboard_event(key: 'Union[Key, KeyCode]', injected: bool = False, state:
             simulation.log(f"Обнаружена активность клавиатуры", 'DEBUG', state)
     except Exception as e:
         simulation.log(f"ОШИБКА в on_keyboard_event: {e}", 'ERROR')
-        if state is None:
-            state = simulation.get_state()
         simulation.log(f"Тип state: {type(state)}, has lock: {hasattr(state, 'lock')}", 'ERROR')
         import traceback
         simulation.log(f"Traceback: {''.join(traceback.format_exc())}", 'ERROR')
 
 
-def on_mouse_event(x: int, y: int, injected: bool = False, state: Optional['simulation.SimulationState'] = None) -> None:
+def on_mouse_event(x: int, y: int, injected: bool = False, state: 'simulation.SimulationState' = None) -> None:
     """
     Обработчик движения мыши/тачпада.
     Автоматически отслеживает как движения мыши, так и тачпада.
@@ -83,12 +76,9 @@ def on_mouse_event(x: int, y: int, injected: bool = False, state: Optional['simu
         x: Координата X
         y: Координата Y
         injected: True если событие инжектировано программой
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
     try:
-        if state is None:
-            state = simulation.get_state()
-
         with state.lock:
             if state.is_performing_action or time.time() < state.sim_action_grace_until:
                 return
@@ -109,14 +99,12 @@ def on_mouse_event(x: int, y: int, injected: bool = False, state: Optional['simu
                 state.last_mouse_log_time = current_time
     except Exception as e:
         simulation.log(f"ОШИБКА в on_mouse_event: {e}", 'ERROR')
-        if state is None:
-            state = simulation.get_state()
         simulation.log(f"Тип state: {type(state)}, has lock: {hasattr(state, 'lock')}", 'ERROR')
         import traceback
         simulation.log(f"Traceback: {''.join(traceback.format_exc())}", 'ERROR')
 
 
-def on_mouse_click(x: int, y: int, button: 'Button', pressed: bool, injected: bool = False, state: Optional['simulation.SimulationState'] = None) -> None:
+def on_mouse_click(x: int, y: int, button: 'Button', pressed: bool, injected: bool = False, state: 'simulation.SimulationState' = None) -> None:
     """
     Обработчик кликов мыши/тачпада.
     Автоматически отслеживает как клики мыши, так и тапы тачпада.
@@ -127,12 +115,9 @@ def on_mouse_click(x: int, y: int, button: 'Button', pressed: bool, injected: bo
         button: Нажатая кнопка
         pressed: True если нажата, False если отпущена
         injected: True если событие инжектировано программой
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
     try:
-        if state is None:
-            state = simulation.get_state()
-
         if pressed:
             with state.lock:
                 if state.is_performing_action or time.time() < state.sim_action_grace_until:
@@ -149,8 +134,6 @@ def on_mouse_click(x: int, y: int, button: 'Button', pressed: bool, injected: bo
                 simulation.log(f"Обнаружен клик мыши", 'DEBUG', state)
     except Exception as e:
         simulation.log(f"ОШИБКА в on_mouse_click: {e}", 'ERROR')
-        if state is None:
-            state = simulation.get_state()
         simulation.log(f"Тип state: {type(state)}, has lock: {hasattr(state, 'lock')}", 'ERROR')
         import traceback
         simulation.log(f"Traceback: {''.join(traceback.format_exc())}", 'ERROR')

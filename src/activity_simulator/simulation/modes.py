@@ -9,7 +9,7 @@ import random
 import time
 from typing import Optional, Callable, Tuple
 
-from .state import get_state, SimulationState, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller
+from .state import SimulationState, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller
 from .logger import log
 from .actions import get_consecutive_safe_key_count, random_mouse_move, safe_key_press
 
@@ -23,7 +23,7 @@ def execute_burst_activity(
     mode_name: str,
     time_indicator: str = "",
     check_break_ended: Optional[Callable[[], Tuple[bool, Optional[str]]]] = None,
-    state: Optional['SimulationState'] = None,
+    state: 'SimulationState' = None,
 ) -> str:
     """
     Универсальная функция выполнения всплеска активности.
@@ -39,13 +39,11 @@ def execute_burst_activity(
         mode_name: Название режима для логов
         time_indicator: Emoji индикатор
         check_break_ended: Функция для проверки окончания перерыва
-        state: Экземпляр состояния (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
 
     Returns:
         str: 'completed', 'interrupted', 'ended', или 'waiting'
     """
-    if state is None:
-        state = get_state()
 
     time_since_burst = time.time() - getattr(state, burst_time_attr)
     burst_interval = random.uniform(
@@ -112,15 +110,13 @@ def execute_burst_activity(
     return 'waiting'
 
 
-def _perform_light_action(state: Optional['SimulationState'] = None) -> None:
+def _perform_light_action(state: 'SimulationState') -> None:
     """
     Выполняет легкое действие (используется в перерывах и внерабочем режиме).
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
-    if state is None:
-        state = get_state()
     config = state.config
 
     consecutive_safe_keys = get_consecutive_safe_key_count(state)

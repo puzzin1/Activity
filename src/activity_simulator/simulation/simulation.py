@@ -8,9 +8,8 @@ import time
 import random
 import os
 from datetime import datetime
-from typing import Optional
 
-from .state import get_state, SimulationState, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller, ExitSimulation
+from .state import SimulationState, MINIMUM_DELAY_AFTER_USER_ACTIVITY, MAX_CONSECUTIVE_SAFE_KEYS, get_mouse_controller, ExitSimulation
 from .logger import log
 from .time_checks import (
     is_work_hours, is_before_work, is_after_work,
@@ -35,7 +34,7 @@ def init_simulation(config: dict, schedule: dict) -> 'SimulationState':
     Returns:
         SimulationState: Инициализированное состояние симуляции
     """
-    state = get_state()
+    state = SimulationState()
     state.set_config(config)
     state.set_schedule(schedule)
     current_time = time.time()
@@ -44,16 +43,14 @@ def init_simulation(config: dict, schedule: dict) -> 'SimulationState':
     return state
 
 
-def simulate_activity() -> None:
+def simulate_activity(state: 'SimulationState') -> None:
     """Основной цикл симуляции активности"""
     import traceback
-    state = get_state()
     state.last_afterhours_burst_time = time.time()
     state.last_break_burst_time = time.time()
 
     try:
         while True:
-            state = get_state()
             config = state.config
 
             # Проверка: прошло ли 60 секунд с момента запуска программы
@@ -165,15 +162,13 @@ def simulate_activity() -> None:
         raise
 
 
-def _handle_work_day_finished(state: Optional['SimulationState'] = None) -> None:
+def _handle_work_day_finished(state: 'SimulationState') -> None:
     """
     Обрабатывает завершение рабочего дня.
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
-    if state is None:
-        state = get_state()
     config = state.config
 
     log(f"🏁 Рабочий день завершен. Программа останавливается (режим: {config['afterhours_mode']})", state=state)
@@ -226,15 +221,13 @@ def _handle_work_day_finished(state: Optional['SimulationState'] = None) -> None
 
 
 
-def _handle_work_mode(state: Optional['SimulationState'] = None) -> None:
+def _handle_work_mode(state: 'SimulationState') -> None:
     """
     Обрабатывает обычный рабочий режим.
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
-    if state is None:
-        state = get_state()
     config = state.config
 
     current_idle_threshold_local = state.current_idle_threshold
@@ -350,17 +343,15 @@ def _handle_work_mode(state: Optional['SimulationState'] = None) -> None:
         time.sleep(1)
 
 
-def show_stats(state: Optional['SimulationState'] = None) -> None:
+def show_stats(state: 'SimulationState') -> None:
     """
     Периодический вывод статистики выполненных действий.
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
     while True:
         time.sleep(300)  # Каждые 5 минут
-        if state is None:
-            state = get_state()
         if len(state.action_history) > 0:
             recent = [a for a in state.action_history if time.time() - a[1] < 3600]
             log(f"[Статистика] Действий за последний час: {len(recent)}", state=state)

@@ -302,10 +302,14 @@ def main() -> None:
     # Ротация лог-файлов (вызывается ПОСЛЕ init_logger, когда state.log_file_path уже установлен)
     simulation.setup_log_rotation(state)
 
-    # Запуск слушателей
-    _keyboard_listener = keyboard.Listener(on_press=listeners.on_keyboard_event)
-    _mouse_listener = mouse.Listener(on_move=listeners.on_mouse_event,
-                                     on_click=listeners.on_mouse_click)
+    # Запуск слушателей (передаем state через lambda-обёртки)
+    _keyboard_listener = keyboard.Listener(
+        on_press=lambda key: listeners.on_keyboard_event(key, state=state)
+    )
+    _mouse_listener = mouse.Listener(
+        on_move=lambda x, y: listeners.on_mouse_event(x, y, state=state),
+        on_click=lambda x, y, button, pressed: listeners.on_mouse_click(x, y, button, pressed, state=state),
+    )
 
     _keyboard_listener.start()
     _mouse_listener.start()
@@ -322,8 +326,8 @@ def main() -> None:
 
     # === ЗАПУСК ПОТОКОВ СИМУЛЯЦИИ ===
     # Запускаем потоки только после вывода всей информации
-    simulate_thread = Thread(target=simulation.simulate_activity, daemon=True)
-    stats_thread = Thread(target=simulation.show_stats, daemon=True)
+    simulate_thread = Thread(target=simulation.simulate_activity, args=(state,), daemon=True)
+    stats_thread = Thread(target=simulation.show_stats, args=(state,), daemon=True)
 
     simulate_thread.start()
     stats_thread.start()

@@ -9,138 +9,89 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 import pytest
 
 
+def _make_mock_state(schedule=None, config=None):
+    """Создает mock-объект состояния с заданными параметрами."""
+    state = MagicMock()
+    state.schedule = schedule or {
+        'work_start': '09:00',
+        'work_end': '18:00',
+        'lunch_start': '13:00',
+        'lunch_end': '14:00',
+        'breaks': []
+    }
+    state.config = config or {}
+    return state
+
+
 class TestIsWorkHours:
     """Tests for is_work_hours() function"""
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_within_work_hours(self, mock_state, mock_time):
+    def test_within_work_hours(self, mock_time):
         """Test when current time is within work hours"""
         mock_time.return_value = 600  # 10:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_work_hours
-        assert is_work_hours() is True
+        assert is_work_hours(state) is True
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_before_work_hours(self, mock_state, mock_time):
+    def test_before_work_hours(self, mock_time):
         """Test when current time is before work hours"""
         mock_time.return_value = 480  # 08:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_work_hours
-        assert is_work_hours() is False
+        assert is_work_hours(state) is False
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_after_work_hours(self, mock_state, mock_time):
+    def test_after_work_hours(self, mock_time):
         """Test when current time is after work hours"""
         mock_time.return_value = 1140  # 19:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_work_hours
-        assert is_work_hours() is False
+        assert is_work_hours(state) is False
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_at_work_start_boundary(self, mock_state, mock_time):
+    def test_at_work_start_boundary(self, mock_time):
         """Test at exact work start time"""
         mock_time.return_value = 540  # 09:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_work_hours
-        assert is_work_hours() is True
+        assert is_work_hours(state) is True
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_at_work_end_boundary(self, mock_state, mock_time):
+    def test_at_work_end_boundary(self, mock_time):
         """Test at exact work end time"""
         mock_time.return_value = 1080  # 18:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_work_hours
-        assert is_work_hours() is True
+        assert is_work_hours(state) is True
 
 
 class TestIsBreakTime:
     """Tests for is_break_time() function"""
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_during_lunch(self, mock_state, mock_time):
+    def test_during_lunch(self, mock_time):
         """Test during lunch break"""
         mock_time.return_value = 780  # 13:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_break_time
-        on_break, break_type = is_break_time()
+        on_break, break_type = is_break_time(state)
 
         assert on_break is True
         assert break_type == 'обед'
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_during_short_break(self, mock_state, mock_time):
+    def test_during_short_break(self, mock_time):
         """Test during short break - 10:30 = 10*60+30 = 630 minutes"""
         mock_time.return_value = 630  # 10:30
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
+        state = _make_mock_state(schedule={
             'work_start': '09:00',
             'work_end': '18:00',
             'lunch_start': '13:00',
@@ -149,33 +100,22 @@ class TestIsBreakTime:
                 {'start': '10:30', 'end': '10:40', 'duration': 10},
                 {'start': '15:30', 'end': '15:40', 'duration': 10}
             ]
-        }
-        mock_state.return_value = mock_state_obj
+        })
 
         from activity_simulator.simulation.time_checks import is_break_time
-        on_break, break_type = is_break_time()
+        on_break, break_type = is_break_time(state)
 
         assert on_break is True
         assert break_type == 'перерыв'
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_not_on_break(self, mock_state, mock_time):
+    def test_not_on_break(self, mock_time):
         """Test when not on break"""
         mock_time.return_value = 720  # 12:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_break_time
-        on_break, break_type = is_break_time()
+        on_break, break_type = is_break_time(state)
 
         assert on_break is False
         assert break_type is None
@@ -185,194 +125,113 @@ class TestIsAfterWork:
     """Tests for is_after_work() function"""
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_after_work(self, mock_state, mock_time):
+    def test_after_work(self, mock_time):
         """Test when after work"""
         mock_time.return_value = 1100  # 18:20
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_after_work
-        assert is_after_work() is True
+        assert is_after_work(state) is True
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_before_work(self, mock_state, mock_time):
+    def test_before_work(self, mock_time):
         """Test when before work"""
         mock_time.return_value = 480  # 08:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_after_work
-        assert is_after_work() is False
+        assert is_after_work(state) is False
 
 
 class TestIsBeforeWork:
     """Tests for is_before_work() function"""
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_before_work(self, mock_state, mock_time):
+    def test_before_work(self, mock_time):
         """Test when before work"""
         mock_time.return_value = 480  # 08:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_before_work
-        assert is_before_work() is True
+        assert is_before_work(state) is True
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_during_work(self, mock_state, mock_time):
+    def test_during_work(self, mock_time):
         """Test when during work hours"""
         mock_time.return_value = 600  # 10:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_before_work
-        assert is_before_work() is False
+        assert is_before_work(state) is False
 
 
 class TestShouldSimulateAfterhours:
     """Tests for should_simulate_afterhours() function"""
 
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    @patch('activity_simulator.simulation.time_checks.is_before_work')
-    @patch('activity_simulator.simulation.time_checks.is_work_hours')
-    def test_disabled_mode(self, mock_work, mock_before, mock_state):
+    def test_disabled_mode(self):
         """Test disabled mode returns False"""
-        mock_state_obj = MagicMock()
-        mock_state_obj.config = {'afterhours_mode': 'disabled'}
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state(config={'afterhours_mode': 'disabled'})
 
         from activity_simulator.simulation.time_checks import should_simulate_afterhours
-        assert should_simulate_afterhours() is False
+        assert should_simulate_afterhours(state) is False
 
-    @patch('activity_simulator.simulation.time_checks.get_state')
     @patch('activity_simulator.simulation.time_checks.is_before_work')
-    @patch('activity_simulator.simulation.time_checks.is_work_hours')
-    def test_before_only_mode_before_work(self, mock_work, mock_before, mock_state):
+    def test_before_only_mode_before_work(self, mock_before):
         """Test before_only mode when before work"""
-        mock_state_obj = MagicMock()
-        mock_state_obj.config = {'afterhours_mode': 'before_only'}
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state(config={'afterhours_mode': 'before_only'})
         mock_before.return_value = True
-        mock_work.return_value = False
 
         from activity_simulator.simulation.time_checks import should_simulate_afterhours
-        assert should_simulate_afterhours() is True
+        assert should_simulate_afterhours(state) is True
 
-    @patch('activity_simulator.simulation.time_checks.get_state')
     @patch('activity_simulator.simulation.time_checks.is_before_work')
-    @patch('activity_simulator.simulation.time_checks.is_work_hours')
-    def test_before_only_mode_after_work(self, mock_work, mock_before, mock_state):
+    def test_before_only_mode_after_work(self, mock_before):
         """Test before_only mode when after work returns False"""
-        mock_state_obj = MagicMock()
-        mock_state_obj.config = {'afterhours_mode': 'before_only'}
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state(config={'afterhours_mode': 'before_only'})
         mock_before.return_value = False
-        mock_work.return_value = False
 
         from activity_simulator.simulation.time_checks import should_simulate_afterhours
-        assert should_simulate_afterhours() is False
+        assert should_simulate_afterhours(state) is False
 
-    @patch('activity_simulator.simulation.time_checks.get_state')
     @patch('activity_simulator.simulation.time_checks.is_work_hours')
-    def test_before_and_after_mode(self, mock_work, mock_state):
+    def test_before_and_after_mode(self, mock_work):
         """Test before_and_after mode"""
-        mock_state_obj = MagicMock()
-        mock_state_obj.config = {'afterhours_mode': 'before_and_after'}
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state(config={'afterhours_mode': 'before_and_after'})
         mock_work.return_value = False
 
         from activity_simulator.simulation.time_checks import should_simulate_afterhours
-        assert should_simulate_afterhours() is True
+        assert should_simulate_afterhours(state) is True
 
-    @patch('activity_simulator.simulation.time_checks.get_state')
     @patch('activity_simulator.simulation.time_checks.is_work_hours')
-    def test_before_and_after_mode_during_work(self, mock_work, mock_state):
+    def test_before_and_after_mode_during_work(self, mock_work):
         """Test before_and_after mode during work hours returns False"""
-        mock_state_obj = MagicMock()
-        mock_state_obj.config = {'afterhours_mode': 'before_and_after'}
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state(config={'afterhours_mode': 'before_and_after'})
         mock_work.return_value = True
 
         from activity_simulator.simulation.time_checks import should_simulate_afterhours
-        assert should_simulate_afterhours() is False
+        assert should_simulate_afterhours(state) is False
 
 
 class TestIsAfterLunch:
     """Tests for is_after_lunch() function"""
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_after_lunch(self, mock_state, mock_time):
+    def test_after_lunch(self, mock_time):
         """Test when after lunch"""
         mock_time.return_value = 900  # 15:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_after_lunch
-        assert is_after_lunch() is True
+        assert is_after_lunch(state) is True
 
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_during_lunch(self, mock_state, mock_time):
+    def test_during_lunch(self, mock_time):
         """Test when during lunch"""
         mock_time.return_value = 780  # 13:00
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = {
-            'work_start': '09:00',
-            'work_end': '18:00',
-            'lunch_start': '13:00',
-            'lunch_end': '14:00',
-            'breaks': []
-        }
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state()
 
         from activity_simulator.simulation.time_checks import is_after_lunch
-        assert is_after_lunch() is False
+        assert is_after_lunch(state) is False
 
 
 class TestParametricTimeChecks:
@@ -450,17 +309,13 @@ class TestParametricTimeChecks:
         ),
     ])
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_is_work_hours_parametric(self, mock_state, mock_time, schedule, current_time_minutes, expected_work):
+    def test_is_work_hours_parametric(self, mock_time, schedule, current_time_minutes, expected_work):
         """Параметрический тест для is_work_hours с разными расписаниями"""
         mock_time.return_value = current_time_minutes
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = schedule
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state(schedule=schedule)
 
         from activity_simulator.simulation.time_checks import is_work_hours
-        assert is_work_hours() is expected_work
+        assert is_work_hours(state) is expected_work
 
     @pytest.mark.parametrize("schedule,current_time_minutes,expected_break,expected_type", [
         # Стандартное расписание с обедом 13-14
@@ -581,17 +436,13 @@ class TestParametricTimeChecks:
         ),
     ])
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_is_break_time_parametric(self, mock_state, mock_time, schedule, current_time_minutes, expected_break, expected_type):
+    def test_is_break_time_parametric(self, mock_time, schedule, current_time_minutes, expected_break, expected_type):
         """Параметрический тест для is_break_time с разными расписаниями"""
         mock_time.return_value = current_time_minutes
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = schedule
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state(schedule=schedule)
 
         from activity_simulator.simulation.time_checks import is_break_time
-        on_break, break_type = is_break_time()
+        on_break, break_type = is_break_time(state)
         assert on_break is expected_break
         assert break_type == expected_type
 
@@ -646,17 +497,13 @@ class TestParametricTimeChecks:
         ),
     ])
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_is_after_lunch_parametric(self, mock_state, mock_time, schedule, current_time_minutes, expected_after_lunch):
+    def test_is_after_lunch_parametric(self, mock_time, schedule, current_time_minutes, expected_after_lunch):
         """Параметрический тест для is_after_lunch с разными расписаниями"""
         mock_time.return_value = current_time_minutes
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = schedule
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state(schedule=schedule)
 
         from activity_simulator.simulation.time_checks import is_after_lunch
-        assert is_after_lunch() is expected_after_lunch
+        assert is_after_lunch(state) is expected_after_lunch
 
     @pytest.mark.parametrize("schedule,current_time_minutes,expected_before_work,expected_after_work", [
         # Стандартное расписание 9-18
@@ -724,15 +571,11 @@ class TestParametricTimeChecks:
         ),
     ])
     @patch('activity_simulator.simulation.time_checks.utils.get_current_time_minutes')
-    @patch('activity_simulator.simulation.time_checks.get_state')
-    def test_before_after_work_parametric(self, mock_state, mock_time, schedule, current_time_minutes, expected_before_work, expected_after_work):
+    def test_before_after_work_parametric(self, mock_time, schedule, current_time_minutes, expected_before_work, expected_after_work):
         """Параметрический тест для is_before_work и is_after_work с разными расписаниями"""
         mock_time.return_value = current_time_minutes
-
-        mock_state_obj = MagicMock()
-        mock_state_obj.schedule = schedule
-        mock_state.return_value = mock_state_obj
+        state = _make_mock_state(schedule=schedule)
 
         from activity_simulator.simulation.time_checks import is_before_work, is_after_work
-        assert is_before_work() is expected_before_work
-        assert is_after_work() is expected_after_work
+        assert is_before_work(state) is expected_before_work
+        assert is_after_work(state) is expected_after_work

@@ -9,7 +9,7 @@ import logging
 import logging.handlers
 import os
 from typing import Optional
-from .state import get_state, SimulationState
+from .state import SimulationState
 
 # Глобальный логгер (инициализируется в main.py)
 _logger: Optional[logging.Logger] = None
@@ -20,7 +20,7 @@ def get_logger() -> Optional[logging.Logger]:
     return _logger
 
 
-def init_logger(file_path: str, enabled: bool = True, verbose: bool = True, state: Optional['SimulationState'] = None) -> None:
+def init_logger(file_path: str, enabled: bool = True, verbose: bool = True, state: 'SimulationState' = None) -> None:
     """
     Инициализирует глобальный логгер с FileHandler и StreamHandler.
 
@@ -28,7 +28,7 @@ def init_logger(file_path: str, enabled: bool = True, verbose: bool = True, stat
         file_path: Путь к файлу лога
         enabled: Включен ли логгер
         verbose: Включено ли подробное логирование
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
     global _logger
 
@@ -65,7 +65,6 @@ def init_logger(file_path: str, enabled: bool = True, verbose: bool = True, stat
     _logger.addHandler(console_handler)
 
     # Сохраняем путь к файлу в состоянии
-    state = get_state()
     state.log_file_path = file_path
 
 
@@ -141,19 +140,17 @@ def log(message: str, level: str = 'INFO', state: Optional['SimulationState'] = 
     _logger.log(log_level, message)
 
 
-def setup_log_rotation(state: Optional['SimulationState'] = None) -> None:
+def setup_log_rotation(state: 'SimulationState') -> None:
     """
     Настраивает RotatingFileHandler для ротации лог-файлов.
 
     Ротация происходит на основе количества файлов (max_files) из конфигурации.
 
     Args:
-        state: Экземпляр состояния симуляции (если None, используется глобальный)
+        state: Экземпляр состояния симуляции
     """
     from ..config import rotate_files
 
-    if state is None:
-        state = get_state()
     config = state.config
     if not config or _logger is None:
         return
