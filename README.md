@@ -39,15 +39,73 @@
 
 ## 🚀 Быстрый старт
 
-### 📦 Установка зависимостей
+### 1️⃣ Установка Python
+
+Программа требует **Python 3.8** или выше. Если Python ещё не установлен:
+
+#### Windows
+
+1. Скачайте установщик с официального сайта: **[python.org/downloads](https://www.python.org/downloads/)**
+2. Запустите скачанный файл
+3. **Обязательно** отметьте галочку **"Add Python to PATH"** (Add python.exe to PATH) на первом экране установщика
+4. Нажмите **"Install Now"** и дождитесь завершения
+5. Проверьте установку — откройте командную строку (`Win+R` → `cmd`) и введите:
+   ```bash
+   python --version
+   ```
+   Должно отобразиться что-то вроде: `Python 3.12.x`
+
+#### macOS
+
+1. Скачайте установщик с **[python.org/downloads](https://www.python.org/downloads/)** или установите через Homebrew:
+   ```bash
+   brew install python3
+   ```
+2. Проверьте установку:
+   ```bash
+   python3 --version
+   ```
+
+#### Linux
+
+Python обычно уже установлен. Проверьте:
 ```bash
-# Основные зависимости
+python3 --version
+```
+Если нет — установите через пакетный менеджер:
+```bash
+# Ubuntu / Debian
+sudo apt install python3 python3-pip
+
+# Fedora
+sudo dnf install python3 python3-pip
+
+# Arch
+sudo pacman -S python python-pip
+```
+
+### 2️⃣ Скачивание программы
+
+Скачайте архив с проектом и распакуйте в удобную папку, или клонируйте через Git:
+```bash
+git clone <url-репозитория>
+cd Activity
+```
+
+### 3️⃣ Установка зависимостей
+
+Откройте терминал (командную строку) в папке проекта и выполните:
+```bash
+# Windows
 pip install pynput pyyaml
+
+# macOS / Linux
+pip3 install pynput pyyaml
 ```
 
 **Примечание:** Библиотека `pyyaml` требуется для работы с конфигурацией YAML. Если она не установлена, программа будет использовать настройки по умолчанию.
 
-### 🖥️ Запуск программы
+### 4️⃣ Запуск программы
 
 #### Windows (самый простой способ)
 ```bash
