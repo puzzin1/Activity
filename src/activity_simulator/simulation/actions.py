@@ -268,7 +268,7 @@ def random_mouse_move(state: 'SimulationState') -> None:
             target_y = max(anchor_y - max_abs_range, min(target_y, anchor_y + max_abs_range))
 
     log(f"Движение мыши: ({state.initial_mouse_position[0]}, {state.initial_mouse_position[1]}) -> ({target_x}, {target_y})")
-    move_mouse_naturally(target_x, target_y)
+    move_mouse_naturally(target_x, target_y, state)
     state.action_history.append(('mouse_move', time.time()))
 
     state.initial_mouse_position = get_mouse_controller().position
