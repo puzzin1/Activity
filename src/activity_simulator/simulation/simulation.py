@@ -171,6 +171,12 @@ def _handle_work_day_finished(state: 'SimulationState') -> None:
     """
     config = state.config
 
+    # Если обнаружена активность пользователя — тихо завершаем без предупреждения
+    if state.user_activity_after_work:
+        log("🚪 Обнаружена активность пользователя после рабочего дня. Завершение программы.", state=state)
+        state.simulation_finished = True
+        raise ExitSimulation("Активность пользователя после рабочего дня", show_warning=False)
+
     log(f"🏁 Рабочий день завершен. Программа останавливается (режим: {config['afterhours_mode']})", state=state)
 
     # Показываем предупреждение, если включено
@@ -183,11 +189,8 @@ def _handle_work_day_finished(state: 'SimulationState') -> None:
     if not should_proceed or state.shutdown_cancelled:
         log("✋ Завершение работы отменено пользователем", state=state)
         print("\n✋ Завершение работы отменено")
-        # Продолжаем работу в режиме ожидания
-        time.sleep(60)
-        state.shutdown_cancelled = False
-        state.user_activity_after_work = False
-        return
+        state.simulation_finished = True
+        raise ExitSimulation("Завершение отменено пользователем", show_warning=False)
 
     print("\n" + "=" * 70)
     print("🏁 РАБОЧИЙ ДЕНЬ ЗАВЕРШЕН")
