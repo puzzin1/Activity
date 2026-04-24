@@ -60,13 +60,11 @@ def move_mouse_naturally(target_x: int, target_y: int, state: 'SimulationState')
         # Проверяем активность пользователя на каждом шаге
         with state.lock:
             if state.last_activity_time > action_start_time:
-                # Пользователь проявил активность - прерываем движение
                 state.action_history.append(('mouse_move', time.time()))
                 state.is_performing_action = False
                 state.is_simulating = False
                 log(f"⚠️ Движение мыши прервано активностью пользователя (шаг {step}/{steps})", 'INFO')
                 return
-            # Проверка активности пользователя после работы
             if state.user_activity_after_work:
                 state.action_history.append(('mouse_move', time.time()))
                 state.is_performing_action = False
@@ -74,14 +72,25 @@ def move_mouse_naturally(target_x: int, target_y: int, state: 'SimulationState')
                 log(f"🚪 Движение мыши прервано активностью пользователя после рабочего дня (шаг {step}/{steps})", 'INFO')
                 return
 
+        # Проверяем позицию мыши перед перемещением — если пользователь двигает
+        current_pos = mouse_controller.position
+        if step > 0 and (abs(current_pos[0] - new_x) > 3 or abs(current_pos[1] - new_y) > 3):
+            now = time.time()
+            with state.lock:
+                state.last_activity_time = now
+                state.action_history.append(('mouse_move', now))
+                state.is_performing_action = False
+                state.is_simulating = False
+            log(f"⚠️ Движение мыши прервано: пользователь двигает мышь (шаг {step}/{steps})", 'INFO')
+            return
+
         t = step / steps
         if config['natural_behavior']:
-            # Кривая ease-in-out для более естественного движения
             t = t * t * (3 - 2 * t)
 
         new_x = start_pos[0] + (dx * t)
         new_y = start_pos[1] + (dy * t)
-        get_mouse_controller().position = (new_x, new_y)
+        mouse_controller.position = (new_x, new_y)
 
         sleep_time = config['smooth_move_duration'] / steps
         if config['natural_behavior'] and random.random() < 0.1:
@@ -89,7 +98,19 @@ def move_mouse_naturally(target_x: int, target_y: int, state: 'SimulationState')
 
         time.sleep(sleep_time)
 
-    get_mouse_controller().position = (target_x, target_y)
+    # Проверяем, не двигал ли пользователь мышь после последнего шага
+    current_pos = mouse_controller.position
+    if steps > 0 and (abs(current_pos[0] - new_x) > 3 or abs(current_pos[1] - new_y) > 3):
+        now = time.time()
+        with state.lock:
+            state.last_activity_time = now
+            state.action_history.append(('mouse_move', now))
+            state.is_performing_action = False
+            state.is_simulating = False
+        log(f"⚠️ Движение мыши прервано: пользователь двигает мышь (после последнего шага)", 'INFO')
+        return
+
+    mouse_controller.position = (target_x, target_y)
 
     with state.lock:
         state.is_performing_action = False
