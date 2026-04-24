@@ -14,12 +14,12 @@
 
   - **`main.py`** (точка входа): Главная функция запуска программы, обработка сигналов, инициализация
   - **`simulation/`** (пакет симуляции): Модульная структура движка симуляции:
-    - **`state.py`**: Класс `SimulationState` для инкапсуляции глобального состояния, константы безопасности. Свойства потокобезопасны (RLock)
-    - **`logger.py`**: `BufferedLogger` для буферизованного логирования и функции логирования
-    - **`time_checks.py`**: Функции проверки времени (`is_work_hours`, `is_break_time`, `is_after_work`)
-    - **`actions.py`**: Функции выполнения действий (`random_mouse_move`, `random_arrow_press`, `mouse_click`, `ctrl_tab`, `safe_key_press`, `type_key_sequence`)
+    - **`state.py`**: Класс `SimulationState` для инкапсуляции глобального состояния, исключение `ExitSimulation`, константы безопасности, ленивые контроллеры ввода (`get_mouse_controller`, `get_keyboard_controller`). Свойства потокобезопасны (RLock)
+    - **`logger.py`**: Логгер на базе стандартного `logging` (`FileHandler` + `StreamHandler`), функции `init_logger`, `close_logger`, `log`, `setup_log_rotation`, маскировка конфиденциальных данных
+    - **`time_checks.py`**: Функции проверки времени (`is_work_hours`, `is_before_work`, `is_after_work`, `is_break_time`, `is_after_lunch`, `should_simulate_afterhours`)
+    - **`actions.py`**: Функции выполнения действий (`random_mouse_move`, `random_arrow_press`, `random_mouse_click`, `control_tab_press`, `safe_key_press`, `type_key_sequence`, `move_mouse_naturally`, `show_shutdown_warning`, `get_consecutive_safe_key_count`)
     - **`modes.py`**: Обработчики режимов всплесков активности (`execute_burst_activity`, `_perform_light_action`)
-    - **`simulation.py`**: Главный цикл симуляции (`simulate_activity`, `show_stats`, `init_simulation`)
+    - **`simulation.py`**: Главный цикл симуляции (`simulate_activity`, `show_stats`, `init_simulation`, `_handle_work_mode`, `_handle_work_day_finished`)
     - **`__init__.py`**: Экспорт публичного API пакета
 
   - **`listeners.py`** (обработчики событий): Слушатели pynput для отслеживания реальной активности пользователя:
@@ -30,21 +30,27 @@
   - **`config.py`** (управление конфигурацией): Загружает конфигурацию из `config.yaml` и управляет генерацией ежедневного расписания. Ключевые компоненты:
     - `DEFAULT_CONFIG`: Резервные настройки по умолчанию, используются если YAML недоступен
     - `load_yaml_config()`: Загружает конфигурацию из `config.yaml` с проверкой целостности
+    - `create_default_yaml()`: Создает файл `config.yaml` с настройками по умолчанию
     - `generate_schedule()`: Создает случайное ежедневное расписание с рабочими часами, обедом, короткими перерывами
     - `load_or_create_config()`: Загружает существующую или создает новую ежедневную JSON-конфигурацию
+    - `rotate_files()`: Удаляет старые файлы, оставляя только указанное количество самых новых
+    - `ensure_config_keys()`: Гарантирует наличие всех ключей из `DEFAULT_CONFIG`
+    - `validate_config_ranges()`: Проверяет, что min-значения не превышают max-значения
+    - `get_config_filename()`: Генерирует имя файла конфигурации на основе текущей даты
     - Логика специального расписания для пятницы с более ранним окончанием работы
 
   - **`utils.py`** (утилиты): Вспомогательные функции:
     - `lock_computer()`, `shutdown_computer()`: Функции блокировки/выключения
     - `parse_key_sequence()`: Парсинг последовательностей клавиш
     - `time_str_to_minutes()`, `minutes_to_time_str()`: Конвертация форматов времени
+    - `get_current_time_minutes()`: Возвращает текущее время в минутах с начала дня
 
 - **`config.yaml`** (корневая директория проекта): **Основной файл для конфигурирования программы**. Содержит все настройки симуляции с подробными комментариями на русском языке. Редактируется вручную для настройки программы.
 
 ### Ключевые паттерны проектирования
 
 1. **Централизованное управление состоянием**: Класс `SimulationState` инкапсулирует глобальное состояние, обеспечивая потокобезопасный доступ через свойства и методы
-2. **Событийно-ориентированная архитектура**: Слушатели pynput обнаруживают реальную активность пользователя и обновляют `last_activity_time` через `get_state()`
+2. **Событийно-ориентированная архитектура**: Слушатели pynput обнаруживают реальную активность пользователя и обновляют `last_activity_time` через экземпляр `state`, переданный через lambda-обёртки в `main.py`
 3. **Модульная структура симуляции**: Движок симуляции разделен на логические модули (state, logger, time_checks, actions, modes, simulation)
 4. **Конфигурационно-управляемое поведение**: Все параметры контролируются через JSON-файлы конфигурации
 5. **Ежедневная генерация расписания**: Случайные, но реалистичные рабочие расписания с равномерным распределением перерывов
@@ -100,7 +106,7 @@ python -m activity_simulator.config
 
 ## Конфигурация и настройка
 
-**Важно:** Основные настройки программы теперь хранятся в файле `activity_simulator/config.yaml`. Этот файл содержит все параметры симуляции с подробными комментариями на русском языке. Файл `config.py` по-прежнему содержит `DEFAULT_CONFIG` — словарь с настройками по умолчанию, который используется как резервный вариант если YAML файл недоступен или поврежден.
+**Важно:** Основные настройки программы хранятся в файле `config.yaml` в корневой директории (рабочей директории программы). Этот файл содержит все параметры симуляции с подробными комментариями на русском языке. Файл `config.py` по-прежнему содержит `DEFAULT_CONFIG` — словарь с настройками по умолчанию, который используется как резервный вариант если YAML файл недоступен или поврежден.
 
 ### Ключевые области конфигурации (в `config.yaml`)
 
@@ -112,8 +118,10 @@ python -m activity_simulator.config
 6. **Расписание рабочего дня**: `work_start_min/max`, `work_end_min/max`, `friday_work_end_min/max`
 7. **Перерывы**: `lunch_start_min`, `lunch_end_max`, `total_break_min/max`, `lunch_duration_min/max`
 8. **Внерабочий режим**: `afterhours_mode` (`disabled`/`before_only`/`before_and_after`)
-9. **Функции безопасности**: `exit_on_activity_after_work`, `lock_on_exit`, `shutdown_on_exit`, `show_shutdown_warning`
+9. **Функции безопасности**: `exit_on_activity_after_work`, `lock_on_exit`, `shutdown_on_exit`, `show_shutdown_warning`, `shutdown_warning_time`
 10. **Действия после обеда**: `after_lunch_action`, `after_lunch_sequence` (имя переменной окружения), `after_lunch_delay`
+11. **Всплески активности (внерабочие/перерывы)**: `afterhours_burst_duration_min/max`, `afterhours_burst_interval_min/max`
+12. **Ротация файлов**: `max_log_files`, `max_config_files`
 
 ### Жизненный цикл файлов конфигурации
 - **Исходные настройки** определяются в `config.yaml` (или `DEFAULT_CONFIG`, если YAML недоступен)
@@ -125,6 +133,8 @@ python -m activity_simulator.config
 ### Важные константы безопасности
 - `MINIMUM_DELAY_AFTER_USER_ACTIVITY = 60` секунд (задано в `src/activity_simulator/simulation/state.py`)
 - `MAX_CONSECUTIVE_SAFE_KEYS = 4` (задано в `src/activity_simulator/simulation/state.py`)
+- `ACTION_HISTORY_CLEAR_THRESHOLD = 100` — порог очистки истории действий
+- `SIM_ACTION_GRACE_PERIOD = 1.0` секунда — grace period после симулированного действия, в течение которого слушатели игнорируют события
 - Прерывание серий действий при обнаружении активности пользователя во время выполнения
 
 ## Навигация по кодовой базе
@@ -142,9 +152,22 @@ python -m activity_simulator.config
   - `is_simulating`: Флаг, указывающий, что симуляция активна
   - `is_performing_action`: Флаг, указывающий, что действие выполняется
   - `action_history`: История выполненных действий (deque)
-  - `config`: Конфигурация программы
-  - `schedule`: Расписание рабочего дня
+  - `config`, `schedule`: Конфигурация и расписание (устанавливаются через `set_config()`/`set_schedule()`)
+  - `log_file_path`: Путь к файлу лога
+  - `current_idle_threshold`: Текущий порог бездействия
+  - `last_mouse_log_time`: Время последнего лога движения мыши
+  - `lunch_sequence_executed`: Флаг выполнения последовательности после обеда
+  - `shutdown_cancelled`: Флаг отмены выключения
+  - `user_activity_after_work`: Флаг активности пользователя после работы
+  - `simulation_finished`: Флаг завершения симуляции
+  - `last_break_burst_time`: Время последнего всплеска во время перерыва
+  - `last_afterhours_burst_time`: Время последнего всплеска внерабочего режима
+  - `program_start_time`: Время запуска программы
+  - `sim_action_grace_until`: Grace period после симулированного действия
+- `ExitSimulation`: Исключение для корректного выхода из симуляции
 - `get_state()`: Функция для получения глобального экземпляра `SimulationState`
+- `create_state()`: Создает новый изолированный экземпляр (для тестирования)
+- Константы: `MINIMUM_DELAY_AFTER_USER_ACTIVITY`, `MAX_CONSECUTIVE_SAFE_KEYS`, `ACTION_HISTORY_CLEAR_THRESHOLD`, `SIM_ACTION_GRACE_PERIOD`
 
 ### Обработчики событий (в `src/activity_simulator/listeners.py`)
 - `on_mouse_event()`: Обрабатывает движение мыши/тачпада
@@ -175,9 +198,9 @@ python -m activity_simulator.config
 ## Работа с кодом
 
 ### При модификации логики симуляции
-- Используйте `get_state()` для получения экземпляра `SimulationState`
+- Экземпляр `SimulationState` создается в `init_simulation()` и передается во все функции через параметр `state`
 - При доступе к общему состоянию свойства `SimulationState` уже потокобезопасны (RLock). Для составных операций используйте `with state.lock:`
-- Проверяйте `state.is_performing_action` в обработчиках событий, чтобы избежать обратной связи
+- Проверяйте `state.is_performing_action` и `state.sim_action_grace_until` в обработчиках событий, чтобы избежать обратной связи
 - Поддерживайте минимальную задержку `MINIMUM_DELAY_AFTER_USER_ACTIVITY` (60 секунд) после активности пользователя
 - Обеспечьте возможность прерывания серий действий при обнаружении активности пользователя
 
