@@ -253,6 +253,9 @@ def _handle_work_mode(state: 'SimulationState') -> None:
         current_idle_threshold_local = effective_threshold
         log(f"Установлен новый порог бездействия: {effective_threshold} сек", 'DEBUG', state)
 
+    # Синхронизируем локальный флаг с состоянием (активность пользователя могла сбросить is_simulating)
+    is_simulating = state.is_simulating
+
     # КРИТИЧЕСКИ ВАЖНО: Минимальная задержка MINIMUM_DELAY_AFTER_USER_ACTIVITY секунд
     if time_since_last_activity >= MINIMUM_DELAY_AFTER_USER_ACTIVITY and \
        (is_simulating or time_since_last_activity >= current_idle_threshold_local):
@@ -301,33 +304,41 @@ def _handle_work_mode(state: 'SimulationState') -> None:
         action = random.choice(available_actions)
         log(f"Выбрано действие: {action}", state=state)
 
-        try:
-            if action == 'mouse_move':
-                random_mouse_move(state)
-            elif action == 'keyboard':
-                random_arrow_press(state)
-            elif action == 'mouse_click':
-                random_mouse_click(state)
-            elif action == 'safe_key':
-                safe_key_press(state)
-            elif action == 'ctrl_tab':
-                control_tab_press(state)
-        except Exception as e:
-            log(f"Ошибка при выполнении действия: {e}", 'ERROR', state)
+        # КОНТРОЛЬНАЯ ПРОВЕРКА: убедимся, что активность пользователя не началась перед действием
+        time_since_last_activity_check = state.time_since_last_user_activity()
+        if time_since_last_activity_check < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+            log(f"⚠️ Действие отменено - обнаружена активность пользователя ({time_since_last_activity_check:.1f} сек)", state=state)
+            with state.lock:
+                state.is_simulating = False
+            is_simulating = False
+        else:
+            try:
+                if action == 'mouse_move':
+                    random_mouse_move(state)
+                elif action == 'keyboard':
+                    random_arrow_press(state)
+                elif action == 'mouse_click':
+                    random_mouse_click(state)
+                elif action == 'safe_key':
+                    safe_key_press(state)
+                elif action == 'ctrl_tab':
+                    control_tab_press(state)
+            except Exception as e:
+                log(f"Ошибка при выполнении действия: {e}", 'ERROR', state)
 
-        # Расчет паузы до следующего действия
-        action_interval = random.uniform(
-            config['min_action_interval'],
-            config['max_action_interval']
-        )
+            # Расчет паузы до следующего действия
+            action_interval = random.uniform(
+                config['min_action_interval'],
+                config['max_action_interval']
+            )
 
-        # Случайное увеличение паузы для естественности
-        if config['natural_behavior'] and random.random() < 0.15:
-            action_interval *= random.uniform(1.5, 2.5)
-            log(f"Увеличенная пауза: {action_interval:.1f} сек", 'DEBUG', state)
+            # Случайное увеличение паузы для естественности
+            if config['natural_behavior'] and random.random() < 0.15:
+                action_interval *= random.uniform(1.5, 2.5)
+                log(f"Увеличенная пауза: {action_interval:.1f} сек", 'DEBUG', state)
 
-        log(f"Следующее действие через {action_interval:.1f} сек", 'DEBUG', state)
-        time.sleep(action_interval)
+            log(f"Следующее действие через {action_interval:.1f} сек", 'DEBUG', state)
+            time.sleep(action_interval)
 
     else:
         # Режим ожидания

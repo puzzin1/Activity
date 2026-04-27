@@ -85,6 +85,14 @@ def execute_burst_activity(
                 state.is_simulating = False
                 break
 
+            # КРИТИЧЕСКОЕ ПРЕРЫВАНИЕ: проверяем активность пользователя перед КАЖДЫМ действием
+            time_since_user_activity = state.time_since_last_user_activity()
+            if time_since_user_activity < MINIMUM_DELAY_AFTER_USER_ACTIVITY:
+                log(f"⚠️ {mode_name}: всплеск прерван активностью пользователя", state=state)
+                burst_interrupted = True
+                state.is_simulating = False
+                break
+
             _perform_light_action(state)
 
             time.sleep(random.uniform(2, 5))
