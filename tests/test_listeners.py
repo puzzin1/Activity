@@ -246,6 +246,67 @@ class TestOnMouseClick:
         assert state.user_activity_after_work is True
 
 
+class TestOnMouseScroll:
+    """Tests for on_mouse_scroll()"""
+
+    @patch('activity_simulator.listeners.simulation')
+    def test_basic_scroll_event(self, mock_sim):
+        """Test basic scroll event updates state"""
+        from activity_simulator.listeners import on_mouse_scroll
+
+        state = create_state()
+        state.is_performing_action = False
+        state.last_activity_time = 0
+        state.current_idle_threshold = 100
+        state.is_simulating = True
+        state.absolute_anchor_position = (500, 500)
+        mock_sim.is_after_work.return_value = False
+        mock_sim.is_work_hours.return_value = True
+        mock_sim.log = Mock()
+
+        on_mouse_scroll(100, 200, 0, -1, state=state)
+
+        # Check that state was updated
+        assert state.last_activity_time > 0
+        assert state.current_idle_threshold is None
+        assert state.is_simulating is False
+        assert state.absolute_anchor_position is None
+
+    @patch('activity_simulator.listeners.simulation')
+    def test_scroll_event_during_simulation(self, mock_sim):
+        """Test scroll event during simulation is ignored"""
+        from activity_simulator.listeners import on_mouse_scroll
+
+        state = create_state()
+        state.is_performing_action = True  # Simulation in progress
+        state.last_activity_time = time.time() - 30
+        mock_sim.log = Mock()
+
+        old_time = state.last_activity_time
+
+        on_mouse_scroll(500, 600, 0, -1, state=state)
+
+        # State should not be updated (simulated event ignored)
+        assert state.last_activity_time == old_time
+
+    @patch('activity_simulator.listeners.simulation')
+    def test_scroll_event_after_work(self, mock_sim):
+        """Test scroll event after work hours sets flag"""
+        from activity_simulator.listeners import on_mouse_scroll
+
+        state = create_state()
+        state.is_performing_action = False
+        state.user_activity_after_work = False
+        mock_sim.is_after_work.return_value = True
+        mock_sim.is_work_hours.return_value = False
+        mock_sim.log = Mock()
+
+        on_mouse_scroll(100, 200, 0, -1, state=state)
+
+        # Check that after work flag was set
+        assert state.user_activity_after_work is True
+
+
 class TestCheckAndUpdateActivityAfterWork:
     """Tests for _check_and_update_activity_after_work()"""
 

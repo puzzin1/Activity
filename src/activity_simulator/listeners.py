@@ -104,6 +104,38 @@ def on_mouse_event(x: int, y: int, injected: bool = False, state: 'simulation.Si
         simulation.log(f"Traceback: {''.join(traceback.format_exc())}", 'ERROR')
 
 
+def on_mouse_scroll(x: int, y: int, dx: int, dy: int, injected: bool = False, state: 'simulation.SimulationState' = None) -> None:
+    """
+    Обработчик прокрутки колеса мыши/тачпада.
+
+    Args:
+        x: Координата X
+        y: Координата Y
+        dx: Горизонтальная прокрутка
+        dy: Вертикальная прокрутка
+        injected: True если событие инжектировано программой
+        state: Экземпляр состояния симуляции
+    """
+    try:
+        with state.lock:
+            if state.is_performing_action or time.time() < state.sim_action_grace_until:
+                return
+
+            if _check_and_update_activity_after_work(state):
+                return
+
+            state.last_activity_time = time.time()
+            state.is_simulating = False
+            state.current_idle_threshold = None
+            state.absolute_anchor_position = None
+            simulation.log(f"Обнаружена прокрутка колеса мыши", 'DEBUG', state)
+    except Exception as e:
+        simulation.log(f"ОШИБКА в on_mouse_scroll: {e}", 'ERROR')
+        simulation.log(f"Тип state: {type(state)}, has lock: {hasattr(state, 'lock')}", 'ERROR')
+        import traceback
+        simulation.log(f"Traceback: {''.join(traceback.format_exc())}", 'ERROR')
+
+
 def on_mouse_click(x: int, y: int, button: 'Button', pressed: bool, injected: bool = False, state: 'simulation.SimulationState' = None) -> None:
     """
     Обработчик кликов мыши/тачпада.

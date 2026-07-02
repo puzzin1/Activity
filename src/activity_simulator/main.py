@@ -309,6 +309,7 @@ def main() -> None:
     _mouse_listener = mouse.Listener(
         on_move=lambda x, y: listeners.on_mouse_event(x, y, state=state),
         on_click=lambda x, y, button, pressed: listeners.on_mouse_click(x, y, button, pressed, state=state),
+        on_scroll=lambda x, y, dx, dy: listeners.on_mouse_scroll(x, y, dx, dy, state=state),
     )
 
     _keyboard_listener.start()
